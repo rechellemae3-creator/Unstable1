@@ -1,0 +1,4747 @@
+-- Unpacked by ZeroVector: the script inside the packed file, as it was written
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local MaterialService = game:GetService("MaterialService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts")
+local MC_Client = PlayerScripts:WaitForChild("MC")
+local MC_Shared = ReplicatedStorage:WaitForChild("MC")
+local Config = require(MC_Shared.Config)
+local Items = require(MC_Shared.Items)
+local Combat = require(MC_Shared.Combat)
+local Physics = require(MC_Shared.Physics)
+local Blocks = require(MC_Shared.Blocks)
+local Images = require(MC_Shared.Images)
+local Effects = require(MC_Shared.Effects)
+local Net = require(MC_Client.Net)
+local Controller = require(MC_Client.Controller)
+local Hands = require(MC_Client.Hands)
+local World = require(MC_Client.World)
+local Visuals = require(MC_Client.Visuals)
+local Hitboxes = require(MC_Client.Hitboxes)
+local Input = require(MC_Client.Input)
+local InventoryScreen = require(MC_Client.InventoryScreen)
+local LocateScreen = require(MC_Client.LocateScreen)
+local Icons = require(MC_Client.Icons)
+local WeaponSkinFX = require(MC_Client.WeaponSkinFX)
+local KillEffects = require(MC_Client.KillEffects)
+local BLOCK = Config.BLOCK
+pcall(function()
+    if not LocalPlayer:GetAttribute("CreatorPanel") and not LocalPlayer:GetAttribute("Operator") then
+        LocalPlayer:SetAttribute("CreatorReach", nil)
+    end
+    for _ = 1, 5 do
+        if debug.info(World.rayBox, "s") == "" then
+            for i = 1, 5 do
+                local ok, upv = pcall(debug.getupvalue, World.rayBox, i)
+                if ok and type(upv) == "function" then
+                    World.rayBox = upv
+                    break
+                end
+            end
+        else
+            break
+        end
+    end
+    for _ = 1, 5 do
+        if debug.info(Physics.overlaps, "s") == "" then
+            for i = 1, 5 do
+                local ok, upv = pcall(debug.getupvalue, Physics.overlaps, i)
+                if ok and type(upv) == "function" then
+                    Physics.overlaps = upv
+                    break
+                end
+            end
+        else
+            break
+        end
+    end
+    for i = #Controller.beforeTick, 1, -1 do
+        if debug.info(Controller.beforeTick[i], "s") == "" then
+            table.remove(Controller.beforeTick, i)
+        end
+    end
+    for i = #Controller.onTick, 1, -1 do
+        if debug.info(Controller.onTick[i], "s") == "" then
+            table.remove(Controller.onTick, i)
+        end
+    end
+end)
+local origU35 = nil
+local foreignCallerFn = nil
+pcall(function()
+    local fn = debug.getupvalue(Net.send, 2)
+    if type(fn) == "function" then
+        foreignCallerFn = fn
+        local ok, val = pcall(debug.getupvalue, fn, 1)
+        if ok and type(val) == "string" then
+            origU35 = val
+            debug.setupvalue(fn, 1, nil)
+        end
+    end
+end)
+local u116_queue = nil
+local u224_targets = nil
+local noteSwapFn = nil
+pcall(function()
+    local okNs, ns = pcall(debug.getupvalue, Hands.select, 2)
+    if okNs and type(ns) == "function" then
+        noteSwapFn = ns
+    end
+    for _, btFn in ipairs(Controller.beforeTick) do
+        if type(btFn) == "function" and debug.info(btFn, "s"):find("Hands") then
+            local ok1, q = pcall(debug.getupvalue, btFn, 1)
+            if ok1 and type(q) == "table" and q.attacks ~= nil then
+                u116_queue = q
+                local ok6, attackFn = pcall(debug.getupvalue, btFn, 6)
+                if ok6 and type(attackFn) == "function" then
+                    local okT, tQueue = pcall(debug.getupvalue, attackFn, 1)
+                    if okT and type(tQueue) == "table" then
+                        u224_targets = tQueue
+                    end
+                end
+                break
+            end
+        end
+    end
+end)
+local visualsRigs = nil
+pcall(function()
+    local ok, up1 = pcall(debug.getupvalue, Visuals.forceRefresh, 1)
+    if ok and type(up1) == "table" then
+        visualsRigs = up1
+    end
+end)
+local Cfg = {
+    AutoMace = true,
+    MaceSilentAim = true,
+    Mace1TickSwap = true,
+    MaceDualSmart = true,
+    MaceAutoReturnSword = true,
+    MaceElytraDive = true,
+    MaceFallSpoof = false,
+    MaceSpoofHeight = 12,
+    MaceAutoBounce = false,
+    KillAura = false,
+    KillAuraMinCharge = 0.90,
+    KillAuraFOV = 360,
+    KillAuraTargetDummies = true,
+    AutoShieldBreak = true,
+    AutoSpearLunge = false,
+    SpearLungeMode = "Hold Spear",
+    SpearAutoSwap = true,
+    SpearFlatAim = true,
+    SpearAimTarget = true,
+    SpearChaseRange = 18,
+    AlwaysCritSpoof = false,
+    ReachValue = 3.0,
+    ReachEnabled = false,
+    HitboxExpand = 0.0,
+    BreachSwap = false,
+    BreachSwapMode = "Auto (Sword & Spear)",
+    SwordReachSwap = false,
+    SwordIFrameSync = true,
+    SwordCritHop = false,
+    SwordWTap = false,
+    SwordJumpReset = false,
+    SwordTriggerBot = false,
+    SwordAimAssist = false,
+    AimAssistFOV = 70,
+    AimAssistSmooth = 0.28,
+    AutoGapple = false,
+    AutoGappleHP = 11,
+    AutoBuffPots = false,
+    AutoShieldBlock = false,
+    TargetHUD = true,
+    TNTCartAura = false,
+    CartCount = 2,
+    CartDetonateMode = "Auto",
+    CartBowTicks = 5,
+    CartCooldown = 14,
+    AutoTotem = true,
+    AutoWaterClutch = true,
+    AntiKB = false,
+    KBHorizontal = 50,
+    KBVertical = 100,
+    NoAttackerSlow = false,
+    NoWebSlow = false,
+    NoFallDamage = false,
+    InfElytraRocket = false,
+    SpeedMultEnabled = false,
+    SpeedMultValue = 1.2,
+    JumpBoostEnabled = false,
+    JumpBoostValue = 1,
+    KeystrokesHUD = true,
+    KeystrokesShowCPS = true,
+    KeystrokesShowSpace = true,
+    KeystrokesRainbow = true,
+    KeystrokesScale = 1.0,
+    ESP = true,
+    ESPShowHP = true,
+    ESPShowKit = true,
+    ESPShowHeld = true,
+    AntiInvis = true,
+    NativeHitboxes = true,
+    ClientKillEffect = false,
+    ClientKillEffectChoice = "Sculk Shriek (Legendary)",
+    ClientKillEffectAll = false,
+}
+local CFG_DIR = "MourierConfig"
+local CFG_FILE = "MourierConfig/settings.json"
+local DefaultCfgSnapshot = {}
+for k, v in pairs(Cfg) do
+    DefaultCfgSnapshot[k] = v
+end
+local savedKeybinds = {
+    WindJumpKey = "R",
+    SpearLungeKey = "V",
+    TNTCartKey = "C",
+    ElytraSwapKey = "X",
+}
+local savedKsPos = nil
+local savedTargetHudPos = nil
+local savedPackFolder = nil
+local savedPackName = nil
+local configLoadedFromDisk = false
+local isRestoringConfig = false
+local saveQueued = false
+local isUnloaded = false
+local function saveConfigNow()
+    if isRestoringConfig or not writefile then return end
+    pcall(function()
+        if makefolder and isfolder and not isfolder(CFG_DIR) then
+            makefolder(CFG_DIR)
+        elseif makefolder and not isfolder then
+            pcall(makefolder, CFG_DIR)
+        end
+        local payload = {
+            version = 1,
+            cfg = Cfg,
+            keybinds = savedKeybinds,
+            ksPos = savedKsPos,
+            targetHudPos = savedTargetHudPos,
+            packFolder = savedPackFolder,
+            packName = savedPackName,
+        }
+        writefile(CFG_FILE, HttpService:JSONEncode(payload))
+    end)
+end
+local function scheduleSave()
+    if isRestoringConfig then return end
+    if saveQueued then return end
+    saveQueued = true
+    task.delay(0.15, function()
+        saveQueued = false
+        saveConfigNow()
+    end)
+end
+local function loadSavedConfig()
+    if not readfile or not isfile then return end
+    pcall(function()
+        if not isfile(CFG_FILE) then return end
+        local raw = readfile(CFG_FILE)
+        if type(raw) ~= "string" or raw == "" then return end
+        local data = HttpService:JSONDecode(raw)
+        if type(data) ~= "table" then return end
+        if type(data.cfg) == "table" then
+            for k, defVal in pairs(DefaultCfgSnapshot) do
+                local v = data.cfg[k]
+                if v ~= nil and type(v) == type(defVal) then
+                    Cfg[k] = v
+                end
+            end
+        end
+        if type(data.keybinds) == "table" then
+            for k, defKey in pairs(savedKeybinds) do
+                if type(data.keybinds[k]) == "string" and data.keybinds[k] ~= "" then
+                    savedKeybinds[k] = data.keybinds[k]
+                end
+            end
+        end
+        if type(data.ksPos) == "table"
+            and type(data.ksPos.xs) == "number"
+            and type(data.ksPos.xo) == "number"
+            and type(data.ksPos.ys) == "number"
+            and type(data.ksPos.yo) == "number" then
+            savedKsPos = data.ksPos
+        end
+        if type(data.targetHudPos) == "table"
+            and type(data.targetHudPos.xs) == "number"
+            and type(data.targetHudPos.xo) == "number"
+            and type(data.targetHudPos.ys) == "number"
+            and type(data.targetHudPos.yo) == "number" then
+            savedTargetHudPos = data.targetHudPos
+        end
+        if type(data.packFolder) == "string" and data.packFolder ~= "" then
+            savedPackFolder = data.packFolder
+            savedPackName = type(data.packName) == "string" and data.packName or data.packFolder
+        end
+        configLoadedFromDisk = true
+    end)
+end
+loadSavedConfig()
+local enemyHurtTicks = {}
+local lastLocalKbTick = -1000
+local lastSwordTarget = nil
+local lastSwordTargetAt = 0
+local wTapResetTick = nil
+pcall(function()
+    Net.on("hurt", function(a1)
+        if isUnloaded or type(a1) ~= "table" then return end
+        if a1.id ~= nil and a1.fresh then
+            enemyHurtTicks[a1.id] = (Controller.tickCount or 0) + 10
+        end
+    end)
+    Net.on("kb", function()
+        if isUnloaded then return end
+        lastLocalKbTick = Controller.tickCount or 0
+    end)
+end)
+local KILL_EFFECT_OPTIONS = {
+    "Sculk Shriek (Legendary)",
+    "Meteor Strike (Legendary)",
+    "Ender Rift (Epic)",
+    "Dragon's Breath (Epic)",
+    "Gust Tornado (Rare)",
+    "Lightning Strike (Rare)",
+    "Rainbow Burst (Uncommon)",
+    "Soul Pyre (Uncommon)",
+    "Random (Any Effect)",
+}
+local KILL_EFFECT_LABEL_TO_ID = {
+    ["Sculk Shriek (Legendary)"] = "sculk_shriek",
+    ["Meteor Strike (Legendary)"] = "meteor",
+    ["Ender Rift (Epic)"] = "ender_rift",
+    ["Dragon's Breath (Epic)"] = "dragon_breath",
+    ["Gust Tornado (Rare)"] = "gust_tornado",
+    ["Lightning Strike (Rare)"] = "lightning",
+    ["Rainbow Burst (Uncommon)"] = "rainbow_burst",
+    ["Soul Pyre (Uncommon)"] = "soul_pyre",
+}
+local ALL_KILL_EFFECT_IDS = {
+    "sculk_shriek",
+    "meteor",
+    "ender_rift",
+    "dragon_breath",
+    "gust_tornado",
+    "lightning",
+    "rainbow_burst",
+    "soul_pyre",
+}
+local function resolveClientKillEffectId()
+    local label = Cfg.ClientKillEffectChoice
+    local exact = label and KILL_EFFECT_LABEL_TO_ID[label]
+    if exact then
+        return exact
+    end
+    return ALL_KILL_EFFECT_IDS[math.random(1, #ALL_KILL_EFFECT_IDS)]
+end
+local origKillEffectsPlay = KillEffects.play
+local pendingClientKills = {}
+local recentClientPlayedVictims = {}
+KillEffects.play = function(effectId, pos, victimEid, model)
+    if not isUnloaded and Cfg.ClientKillEffect then
+        local shouldReplace = Cfg.ClientKillEffectAll or (victimEid ~= nil and pendingClientKills[victimEid] ~= nil)
+        if shouldReplace then
+            if victimEid ~= nil then
+                pendingClientKills[victimEid] = nil
+                recentClientPlayedVictims[victimEid] = os.clock()
+            end
+            effectId = resolveClientKillEffectId()
+        end
+    end
+    return origKillEffectsPlay(effectId, pos, victimEid, model)
+end
+pcall(function()
+    Net.on("fx", function(a1)
+        if isUnloaded or not Cfg.ClientKillEffect or type(a1) ~= "table" then return end
+        if a1.kind ~= "killSound" or a1.victim == nil then return end
+        local myChar = LocalPlayer.Character
+        local myEid = myChar and myChar:GetAttribute("EntityId")
+        local isMine = (myEid ~= nil and a1.killer == myEid)
+        if not Cfg.ClientKillEffectAll and not isMine then return end
+        local worldPos = (typeof(a1.pos) == "Vector3") and (a1.pos * BLOCK) or nil
+        if not worldPos then return end
+        local vid = a1.victim
+        local now = os.clock()
+        if recentClientPlayedVictims[vid] and (now - recentClientPlayedVictims[vid]) < 0.25 then
+            return
+        end
+        pendingClientKills[vid] = worldPos
+        task.delay(0.08, function()
+            if isUnloaded then return end
+            local pPos = pendingClientKills[vid]
+            if not pPos then return end
+            pendingClientKills[vid] = nil
+            local playedAt = recentClientPlayedVictims[vid]
+            if playedAt and (os.clock() - playedAt) < 0.25 then
+                return
+            end
+            recentClientPlayedVictims[vid] = os.clock()
+            if Cfg.ClientKillEffect then
+                pcall(origKillEffectsPlay, resolveClientKillEffectId(), pPos, vid)
+            end
+        end)
+    end)
+end)
+local function previewClientKillEffect()
+    local posWorld
+    if Controller.state and Controller.state.pos then
+        local look = Controller.look()
+        local flat = Vector3.new(look.X, 0, look.Z)
+        if flat.Magnitude < 1e-4 then flat = Vector3.new(0, 0, -1) end
+        posWorld = (Controller.state.pos + flat.Unit * 3.0) * BLOCK
+    elseif Workspace.CurrentCamera then
+        local cf = Workspace.CurrentCamera.CFrame
+        posWorld = cf.Position + cf.LookVector * 12
+    else
+        posWorld = Vector3.new(0, 10, 0)
+    end
+    pcall(origKillEffectsPlay, resolveClientKillEffectId(), posWorld, nil, nil)
+end
+pcall(function()
+    Hitboxes.set(Cfg.NativeHitboxes)
+    if Cfg.ReachEnabled and (LocalPlayer:GetAttribute("CreatorPanel") or LocalPlayer:GetAttribute("Operator")) then
+        LocalPlayer:SetAttribute("CreatorReach", Cfg.ReachValue)
+    end
+end)
+local lmbClicks = {}
+local rmbClicks = {}
+local function recordLMB()
+    table.insert(lmbClicks, os.clock())
+end
+local function recordRMB()
+    table.insert(rmbClicks, os.clock())
+end
+local function isAlive()
+    if Workspace:GetAttribute("JugHold") == true then return false end
+    local char = LocalPlayer.Character
+    return Controller.state ~= nil and char ~= nil and char:GetAttribute("Alive") == true
+end
+local function findHotbarSlot(predicate)
+    for i = 1, 9 do
+        local item = Hands.inv.hotbar[i]
+        if item and predicate(item) then
+            return i, item
+        end
+    end
+    return nil, nil
+end
+local function findAnySlot(predicate)
+    for i = 1, 9 do
+        local item = Hands.inv.hotbar[i]
+        if item and predicate(item) then
+            return i, item, "hotbar"
+        end
+    end
+    for k, item in pairs(Hands.inv.inventory) do
+        if type(k) == "number" and item and predicate(item) then
+            return k + 10, item, "inventory"
+        end
+    end
+    return nil, nil, nil
+end
+local function getBestMaceSlot(fallDist)
+    local densitySlot, breachSlot, anyMaceSlot = nil, nil, nil
+    for i = 1, 9 do
+        local item = Hands.inv.hotbar[i]
+        if item and item.id == "mace" then
+            anyMaceSlot = anyMaceSlot or i
+            if item.ench then
+                if (item.ench.density or 0) > 0 or (item.ench.wind_burst or 0) > 0 then
+                    densitySlot = densitySlot or i
+                end
+                if (item.ench.breach or 0) > 0 then
+                    breachSlot = breachSlot or i
+                end
+            end
+        end
+    end
+    if not Cfg.MaceDualSmart then
+        return densitySlot or breachSlot or anyMaceSlot
+    end
+    if fallDist > 5.5 and densitySlot then
+        return densitySlot
+    end
+    if breachSlot and fallDist <= 5.5 then
+        return breachSlot
+    end
+    return densitySlot or breachSlot or anyMaceSlot
+end
+local function getBestSwordSlot()
+    return (findHotbarSlot(function(it)
+        local def = Items.def(it)
+        return def and def.kind == "sword"
+    end))
+end
+local function getBestAxeSlot()
+    return (findHotbarSlot(function(it)
+        local def = Items.def(it)
+        return def and def.disablesShield == true
+    end))
+end
+local function getBestLungeSpearSlot()
+    local bestSlot, bestScore = nil, -1
+    for i = 1, 9 do
+        local it = Hands.inv.hotbar[i]
+        if it then
+            local def = Items.def(it)
+            if def and def.kind == "spear" then
+                local lungeLvl = Items.ench(it, "lunge") or 0
+                if lungeLvl > 0 then
+                    local score = lungeLvl * 100 + (def.damage or 0)
+                    if score > bestScore then
+                        bestScore = score
+                        bestSlot = i
+                    end
+                end
+            end
+        end
+    end
+    return bestSlot
+end
+local function getEffectiveAttackStrength()
+    if noteSwapFn then
+        local ok1, u95 = pcall(debug.getupvalue, noteSwapFn, 1)
+        local ok3, u96 = pcall(debug.getupvalue, noteSwapFn, 3)
+        if ok1 and ok3 and type(u96) == "table" and (Controller.tickCount - (tonumber(u95) or -99)) <= 1 then
+            local def = u96.item and Items.def(u96.item)
+            return Combat.strength(Controller.tickCount - (u96.reset or 0), def and def.speed or 4)
+        end
+    end
+    return Hands.strength(0)
+end
+local function isTargetShieldingFrom(eyePos, target)
+    local model = target.model
+    if model and model:GetAttribute("Using") == "shield" and model.PrimaryPart then
+        local toAttacker = eyePos * BLOCK - model.PrimaryPart.Position
+        local look = model.PrimaryPart.CFrame.LookVector
+        if Vector3.new(toAttacker.X, 0, toAttacker.Z):Dot(Vector3.new(look.X, 0, look.Z)) > 0 then
+            return true
+        end
+    end
+    return false
+end
+local function getBestAimPointAndAngles(eyePos, target)
+    local width = target.width or Config.WIDTH
+    local height = target.height or Config.HEIGHT
+    local halfW = (width * 0.5) * 0.80
+    local minB = Vector3.new(target.feet.X - halfW, target.feet.Y + 0.08, target.feet.Z - halfW)
+    local maxB = Vector3.new(target.feet.X + halfW, target.feet.Y + height - 0.08, target.feet.Z + halfW)
+    local closestPt = Vector3.new(
+        math.clamp(eyePos.X, minB.X, maxB.X),
+        math.clamp(eyePos.Y, minB.Y, maxB.Y),
+        math.clamp(eyePos.Z, minB.Z, maxB.Z)
+    )
+    local centerPt = target.feet + Vector3.new(0, height * 0.5, 0)
+    local aimPt = closestPt:Lerp(centerPt, 0.25)
+    local delta = aimPt - eyePos
+    if delta.Magnitude < 1e-5 then
+        return Controller.look(), Controller.yaw, Controller.pitch
+    end
+    local unit = delta.Unit
+    local yaw = math.atan2(-unit.X, -unit.Z)
+    local pitch = math.asin(math.clamp(unit.Y, -0.999, 0.999))
+    return unit, yaw, pitch
+end
+local origRayBox = World.rayBox
+local function getClosestTarget(maxReach, fovDeg)
+    local state = Controller.state
+    local eye = Controller.eye()
+    if not state or not eye then return nil, nil end
+    local myLook = Controller.look()
+    local cosHalfFov = math.cos(math.rad((fovDeg or 360) * 0.5))
+    local bestTarget, bestDist = nil, maxReach
+    for _, t in ipairs(World.targets()) do
+        if not Cfg.KillAuraTargetDummies and t.model.Parent == World.folder.Dummies then
+            continue
+        end
+        local aimDir = getBestAimPointAndAngles(eye, t)
+        if (fovDeg or 360) >= 359 or myLook:Dot(aimDir) >= cosHalfFov then
+            local hitDist = origRayBox(eye, aimDir, t.feet, t.height, 0, t.width)
+            if hitDist and hitDist <= bestDist then
+                local wall = World.blockRay(eye, aimDir, hitDist, {"Solid"})
+                local web = World.blockRay(eye, aimDir, 4.5, {"Webs"})
+                local webBlocked = (web ~= nil and web.dist <= hitDist)
+                if (not wall or wall.dist >= hitDist) and not webBlocked then
+                    bestTarget = t
+                    bestDist = hitDist
+                end
+            end
+        end
+    end
+    return bestTarget, bestDist
+end
+local lastTotemTick = 0
+local pendingRestoreSlot = nil
+local pendingRestoreTick = 0
+local function sendSafeInventoryOp(packets)
+    local wasOpen = false
+    pcall(function()
+        wasOpen = InventoryScreen.isOpen()
+    end)
+    if not wasOpen then
+        Net.send({a = "inv", op = "open"})
+    end
+    for _, pkt in ipairs(packets) do
+        Net.send(pkt)
+    end
+    if not wasOpen then
+        Net.send({a = "inv", op = "close"})
+    end
+end
+local function stepAutoTotem()
+    if not Cfg.AutoTotem or not isAlive() then return false end
+    if Controller.tickCount - lastTotemTick < 5 then return false end
+    local offhand = Hands.inv.offhand
+    if offhand and offhand.id == "totem_of_undying" then return false end
+    local slot, _, where = findAnySlot(function(it)
+        return it.id == "totem_of_undying"
+    end)
+    if not slot then return false end
+    lastTotemTick = Controller.tickCount
+    if where == "hotbar" and u116_queue then
+        local prevSlot = Hands.inv.selected
+        if prevSlot ~= slot then
+            u116_queue.select = slot
+            pendingRestoreSlot = prevSlot
+            pendingRestoreTick = Controller.tickCount + 1
+        end
+        u116_queue.swaps = (u116_queue.swaps or 0) + 1
+        return true
+    else
+        sendSafeInventoryOp({
+            {a = "inv", op = "key", slot = slot, target = 10},
+        })
+        return true
+    end
+end
+local lastArmorSwapTick = 0
+local function swapChestArmor(wantElytra, hotbarOnly)
+    if not isAlive() or Controller.tickCount - lastArmorSwapTick < 5 then return false end
+    local currentChest = Hands.inv.armor and Hands.inv.armor.chest
+    local currentlyElytra = currentChest and currentChest.id == "elytra"
+    if wantElytra ~= nil and currentlyElytra == wantElytra then
+        return false
+    end
+    local targetSlot, _, where = findAnySlot(function(it)
+        if wantElytra == true then
+            return it.id == "elytra"
+        elseif wantElytra == false then
+            local def = Items.def(it)
+            return def and def.kind == "armor" and def.slot == "chest"
+        else
+            local def = Items.def(it)
+            return it.id == "elytra" or (def and def.kind == "armor" and def.slot == "chest")
+        end
+    end)
+    if not targetSlot then return false end
+    if hotbarOnly and where ~= "hotbar" then return false end
+    lastArmorSwapTick = Controller.tickCount
+    if where == "hotbar" and u116_queue then
+        local prev = Hands.inv.selected
+        if prev ~= targetSlot then
+            u116_queue.select = targetSlot
+            pendingRestoreSlot = prev
+            pendingRestoreTick = Controller.tickCount + 1
+        end
+        u116_queue.uses = (u116_queue.uses or 0) + 1
+        recordRMB()
+        return true
+    else
+        sendSafeInventoryOp({
+            {a = "inv", op = "click", slot = targetSlot, shift = false, right = false},
+            {a = "inv", op = "click", slot = 102, shift = false, right = false},
+            {a = "inv", op = "click", slot = targetSlot, shift = false, right = false},
+        })
+        return true
+    end
+end
+local wantWindJump = false
+local virtualJumpReleaseTick = nil
+local function doWindChargeJump()
+    if isAlive() and Hands.cooldownFraction("wind_charge") <= 0 then
+        wantWindJump = true
+    end
+end
+local lastAutoAttackTick = 0
+local lastMaceSmashTick = 0
+local savedYaw, savedPitch = nil, nil
+local function getTargetHurtRemaining(target)
+    if not target or not target.model then return 0 end
+    local eid = target.model:GetAttribute("EntityId")
+    if eid == nil then return 0 end
+    return (enemyHurtTicks[eid] or 0) - Controller.tickCount
+end
+local function getAnySpearSlot()
+    return (findHotbarSlot(function(it)
+        local def = Items.def(it)
+        return def and def.kind == "spear"
+    end))
+end
+local function getBestBreachMaceSlot()
+    local bestSlot, bestScore = nil, -999
+    for i = 1, 9 do
+        local it = Hands.inv.hotbar[i]
+        if it and it.id == "mace" then
+            local breachLvl = Items.ench(it, "breach") or 0
+            if breachLvl > 0 then
+                local wbLvl = Items.ench(it, "wind_burst") or 0
+                local score = breachLvl * 20 - wbLvl * 5
+                if score > bestScore then
+                    bestScore = score
+                    bestSlot = i
+                end
+            end
+        end
+    end
+    return bestSlot
+end
+local function wantsBreachSwapForKind(kind)
+    if not Cfg.BreachSwap or Config.NO_MACE then return false end
+    local mode = Cfg.BreachSwapMode or "Auto (Sword & Spear)"
+    if kind == "sword" then
+        return mode == "Auto (Sword & Spear)" or mode == "Sword -> Breach"
+    elseif kind == "spear" then
+        return mode == "Auto (Sword & Spear)" or mode == "Spear -> Breach (4.5m)"
+    end
+    return false
+end
+local function queueNativeAttack(target, forceMaceSmash, noSilentRotate)
+    local state = Controller.state
+    local eye = Controller.eye()
+    if not state or not eye or not target or not u116_queue then return false end
+    if not forceMaceSmash and Hands.using and Hands.using.kind == "eat" then
+        return false
+    end
+    if forceMaceSmash then
+        if Controller.tickCount - lastMaceSmashTick < 6 then return false end
+    else
+        if Controller.tickCount - lastAutoAttackTick < 3 then return false end
+    end
+    local aimLook, aimYaw, aimPitch = Controller.look(), Controller.yaw, Controller.pitch
+    if not noSilentRotate and (Cfg.MaceSilentAim or Cfg.KillAura) then
+        aimLook, aimYaw, aimPitch = getBestAimPointAndAngles(eye, target)
+    end
+    local shielded = isTargetShieldingFrom(eye, target)
+    if not forceMaceSmash and not shielded and Cfg.SwordIFrameSync then
+        if getTargetHurtRemaining(target) > 0 then
+            return false
+        end
+    end
+    local origSlot = Hands.inv.selected
+    local chosenSlot = origSlot
+    local origHeld = Hands.held()
+    local origDef = origHeld and Items.def(origHeld)
+    local usedBreachSwap = false
+    if shielded and Cfg.AutoShieldBreak then
+        local axeSlot = getBestAxeSlot()
+        if axeSlot then
+            chosenSlot = axeSlot
+        end
+    elseif forceMaceSmash then
+        local effFall = Cfg.MaceFallSpoof and math.max(state.fallDistance, Cfg.MaceSpoofHeight) or state.fallDistance
+        local maceSlot = getBestMaceSlot(effFall)
+        if maceSlot then
+            chosenSlot = maceSlot
+        end
+    elseif origDef and wantsBreachSwapForKind(origDef.kind) then
+        local breachSlot = getBestBreachMaceSlot()
+        if breachSlot then
+            chosenSlot = breachSlot
+            usedBreachSwap = true
+        end
+    elseif Cfg.SwordReachSwap and origDef and origDef.kind == "spear" then
+        local swordSlot = getBestSwordSlot()
+        if swordSlot then
+            chosenSlot = swordSlot
+        end
+    end
+    if Hands.using and Hands.using.kind == "shield" then
+        pcall(Hands.stopUsing, false)
+    end
+    if not forceMaceSmash then
+        local effCharge = getEffectiveAttackStrength()
+        if effCharge < (tonumber(Cfg.KillAuraMinCharge) or 0.90) then
+            return false
+        end
+    end
+    if chosenSlot ~= origSlot then
+        u116_queue.select = chosenSlot
+        if usedBreachSwap then
+            if origDef and origDef.kind == "spear" and Cfg.BreachSwapMode == "Spear -> Breach (4.5m)" then
+                pendingRestoreSlot = origSlot
+            elseif Cfg.MaceAutoReturnSword then
+                pendingRestoreSlot = getBestSwordSlot() or origSlot
+            else
+                pendingRestoreSlot = origSlot
+            end
+            pendingRestoreTick = Controller.tickCount + 1
+        elseif forceMaceSmash and Cfg.MaceAutoReturnSword then
+            pendingRestoreSlot = getBestSwordSlot() or origSlot
+            pendingRestoreTick = Controller.tickCount + 1
+        elseif shielded and Cfg.AutoShieldBreak then
+            pendingRestoreSlot = getBestSwordSlot() or origSlot
+            pendingRestoreTick = Controller.tickCount + 1
+        end
+        if forceMaceSmash and not Cfg.Mace1TickSwap then
+            return true
+        end
+    end
+    if forceMaceSmash and Cfg.MaceFallSpoof then
+        state.fallDistance = math.max(state.fallDistance, Cfg.MaceSpoofHeight)
+        state.onGround = false
+        state.gliding = false
+    elseif not forceMaceSmash and Cfg.AlwaysCritSpoof then
+        state.fallDistance = math.max(state.fallDistance, 0.25)
+        state.onGround = false
+        state.sprinting = false
+    end
+    if not forceMaceSmash and Cfg.SwordWTap and not Cfg.AlwaysCritSpoof then
+        if state.onGround or state.vel.Y >= 0 then
+            state.sprinting = true
+            wTapResetTick = Controller.tickCount + 1
+        end
+    end
+    if not noSilentRotate and (Cfg.MaceSilentAim or Cfg.KillAura) then
+        if savedYaw == nil then
+            savedYaw = Controller.yaw
+            savedPitch = Controller.pitch
+        end
+        Controller.yaw = aimYaw
+        Controller.pitch = aimPitch
+    end
+    u116_queue.attacks = 1
+    if u224_targets then
+        table.clear(u224_targets)
+        table.insert(u224_targets, {
+            look = Controller.look(),
+            target = target,
+        })
+    end
+    recordLMB()
+    lastSwordTarget = target
+    lastSwordTargetAt = os.clock()
+    lastAutoAttackTick = Controller.tickCount
+    if forceMaceSmash then
+        lastMaceSmashTick = Controller.tickCount
+    end
+    return true
+end
+local cartJob = nil
+local lastCartComboTick = -100
+local function aimAnglesForPos(eyePos, blockPt)
+    local delta = blockPt - eyePos
+    if delta.Magnitude < 1e-5 then
+        return Controller.look(), Controller.yaw, Controller.pitch
+    end
+    local unit = delta.Unit
+    local yaw = math.atan2(-unit.X, -unit.Z)
+    local pitch = math.asin(math.clamp(unit.Y, -0.999, 0.999))
+    return unit, yaw, pitch
+end
+local function isBlockSolidAt(cell)
+    local solid = World.folder and World.folder:FindFirstChild("Solid")
+    if not solid then return false end
+    local center = (cell + Vector3.new(0.5, 0.5, 0.5)) * BLOCK
+    local op = OverlapParams.new()
+    op.FilterType = Enum.RaycastFilterType.Include
+    op.FilterDescendantsInstances = { solid }
+    return #Workspace:GetPartBoundsInBox(CFrame.new(center), Vector3.new(0.8, 0.8, 0.8) * BLOCK, op) > 0
+end
+local function isCellOccupiedForRail(cell)
+    if not World.folder then return false end
+    local folders = {}
+    for _, name in ipairs({"Solid", "Webs", "Rails"}) do
+        local f = World.folder:FindFirstChild(name)
+        if f then table.insert(folders, f) end
+    end
+    if #folders == 0 then return false end
+    local center = (cell + Vector3.new(0.5, 0.5, 0.5)) * BLOCK
+    local op = OverlapParams.new()
+    op.FilterType = Enum.RaycastFilterType.Include
+    op.FilterDescendantsInstances = folders
+    return #Workspace:GetPartBoundsInBox(CFrame.new(center), Vector3.new(0.8, 0.8, 0.8) * BLOCK, op) > 0
+end
+local function findNearestCartPivot(eyePos, maxReach)
+    local carts = World.folder and World.folder:FindFirstChild("Carts")
+    if not carts then return nil, nil end
+    local bestCart, bestPt, bestDist = nil, nil, maxReach or 4.5
+    for _, c in ipairs(carts:GetChildren()) do
+        if c:GetAttribute("CartId") and c:IsA("Model") then
+            local pt = (c:GetPivot().Position / BLOCK) + Vector3.new(0, 0.35, 0)
+            local d = (pt - eyePos).Magnitude
+            if d <= bestDist then
+                bestDist = d
+                bestCart = c
+                bestPt = pt
+            end
+        end
+    end
+    return bestCart, bestPt
+end
+local function findBestCartSetup(allowCrosshairFallback)
+    local eye = Controller.eye()
+    if not eye then return nil end
+    local bestTarget = getClosestTarget(4.35, 360)
+    local railsFolder = World.folder and World.folder:FindFirstChild("Rails")
+    if railsFolder and bestTarget then
+        local tPos = bestTarget.feet
+        local bestRailCell, bestScore = nil, 999
+        for _, r in ipairs(railsFolder:GetChildren()) do
+            local rCell = Vector3.new(
+                math.floor(r.Position.X / BLOCK),
+                math.floor(r.Position.Y / BLOCK),
+                math.floor(r.Position.Z / BLOCK)
+            )
+            local rCenter = rCell + Vector3.new(0.5, 0.08, 0.5)
+            local distEye = (rCenter - eye).Magnitude
+            local distEnemy = (rCenter - (tPos + Vector3.new(0, 0.5, 0))).Magnitude
+            if distEye <= 4.35 and distEnemy <= 2.6 and distEnemy < bestScore then
+                local rayHit = World.blockRay(eye, (rCenter - eye).Unit, 4.5, {"Solid", "Rails"})
+                if rayHit and rayHit.part == r then
+                    bestScore = distEnemy
+                    bestRailCell = rCell
+                end
+            end
+        end
+        if bestRailCell then
+            return { railCell = bestRailCell, needsRail = false, floorHitPt = nil }
+        end
+    end
+    if bestTarget then
+        local fx = math.floor(bestTarget.feet.X)
+        local fy = math.floor(bestTarget.feet.Y + 0.1)
+        local fz = math.floor(bestTarget.feet.Z)
+        local offsets = {
+            {0,0,0}, {1,0,0}, {-1,0,0}, {0,0,1}, {0,0,-1},
+            {1,0,1}, {-1,0,-1}, {1,0,-1}, {-1,0,1},
+            {0,-1,0}, {1,-1,0}, {-1,-1,0}, {0,-1,1}, {0,-1,-1}
+        }
+        for _, o in ipairs(offsets) do
+            local rc = Vector3.new(fx + o[1], fy + o[2], fz + o[3])
+            local fc = rc - Vector3.new(0, 1, 0)
+            if isBlockSolidAt(fc) and not isCellOccupiedForRail(rc) then
+                local hitPt = Vector3.new(rc.X + 0.5, rc.Y + 0.0, rc.Z + 0.5)
+                local delta = hitPt - eye
+                if delta.Magnitude <= 4.35 and delta.Magnitude > 0.2 then
+                    local rayHit = World.blockRay(eye, delta.Unit, 4.5, {"Solid"})
+                    if rayHit and rayHit.normal.Y >= 0.5
+                       and math.floor(rayHit.cell.X + 0.5) == fc.X
+                       and math.floor(rayHit.cell.Y + 0.5) == fc.Y
+                       and math.floor(rayHit.cell.Z + 0.5) == fc.Z then
+                        return { railCell = rc, needsRail = true, floorHitPt = hitPt }
+                    end
+                end
+            end
+        end
+    end
+    if allowCrosshairFallback then
+        local look = Controller.look()
+        local hit = World.blockRay(eye, look, 4.5, {"Solid", "Rails"})
+        if hit then
+            if hit.part:GetAttribute("Block") == "Rail" then
+                return { railCell = hit.cell, needsRail = false, floorHitPt = nil }
+            elseif hit.normal.Y >= 0.5 then
+                local rc = hit.cell + Vector3.new(0, 1, 0)
+                return { railCell = rc, needsRail = true, floorHitPt = hit.pos }
+            end
+        end
+    end
+    return nil
+end
+local function findIgniteHitPoint(eye, railCell)
+    local dirs = {
+        Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0),
+        Vector3.new(0, 0, 1), Vector3.new(0, 0, -1),
+        Vector3.new(1, 0, 1), Vector3.new(-1, 0, -1)
+    }
+    for _, d in ipairs(dirs) do
+        local fc = railCell + d - Vector3.new(0, 1, 0)
+        if isBlockSolidAt(fc) then
+            local pt = Vector3.new(fc.X + 0.5, fc.Y + 1.0, fc.Z + 0.5)
+            local delta = pt - eye
+            if delta.Magnitude <= 4.4 and delta.Magnitude > 0.2 then
+                local hit = World.blockRay(eye, delta.Unit, 4.5, {"Solid", "Webs", "Rails"})
+                if hit and hit.normal.Y >= 0.5
+                   and math.floor(hit.cell.X + 0.5) == fc.X
+                   and math.floor(hit.cell.Y + 0.5) == fc.Y
+                   and math.floor(hit.cell.Z + 0.5) == fc.Z then
+                    return pt
+                end
+            end
+        end
+    end
+    return nil
+end
+local function triggerTNTCartBurst(isManual)
+    if cartJob then return false end
+    if not u116_queue or not isAlive() then return false end
+    if Controller.tickCount - lastCartComboTick < (isManual and 4 or (tonumber(Cfg.CartCooldown) or 14)) then
+        return false
+    end
+    local hasCart = findHotbarSlot(function(it) return it.id == "tnt_minecart" end) ~= nil
+    if not hasCart then return false end
+    local setup = findBestCartSetup(isManual)
+    if not setup then return false end
+    local hasRail = findHotbarSlot(function(it) return it.id == "rail" end) ~= nil
+    if setup.needsRail and not hasRail then return false end
+    lastCartComboTick = Controller.tickCount
+    cartJob = {
+        step = setup.needsRail and "rail" or "cart",
+        railCell = setup.railCell,
+        floorHitPt = setup.floorHitPt or (setup.railCell + Vector3.new(0.5, 0.0, 0.5)),
+        placedCarts = 0,
+        targetCarts = math.clamp(tonumber(Cfg.CartCount) or 2, 1, 4),
+        usedSlots = {},
+        origSlot = Hands.inv.selected,
+        bowStartTick = 0,
+        expiresTick = Controller.tickCount + 30,
+    }
+    return true
+end
+local function stepTNTCartJob()
+    if not cartJob or not u116_queue then return false end
+    local eye = Controller.eye()
+    if not eye or Controller.tickCount > cartJob.expiresTick then
+        cartJob = nil
+        return false
+    end
+    local aimAt = function(pt)
+        local _, y, p = aimAnglesForPos(eye, pt)
+        if savedYaw == nil then
+            savedYaw = Controller.yaw
+            savedPitch = Controller.pitch
+        end
+        Controller.yaw = y
+        Controller.pitch = p
+    end
+    if cartJob.step == "rail" then
+        local railSlot = findHotbarSlot(function(it) return it.id == "rail" end)
+        if not railSlot then
+            cartJob = nil
+            return false
+        end
+        if Hands.inv.selected ~= railSlot then
+            u116_queue.select = railSlot
+        end
+        aimAt(cartJob.floorHitPt)
+        u116_queue.attacks = 0
+        if u224_targets then table.clear(u224_targets) end
+        u116_queue.uses = 1
+        recordRMB()
+        cartJob.step = "cart"
+        return true
+    end
+    if cartJob.step == "cart" then
+        local cartSlot = nil
+        for i = 1, 9 do
+            local it = Hands.inv.hotbar[i]
+            if it and it.id == "tnt_minecart" and not cartJob.usedSlots[i] then
+                cartSlot = i
+                break
+            end
+        end
+        if cartSlot and cartJob.placedCarts < cartJob.targetCarts then
+            if Hands.inv.selected ~= cartSlot then
+                u116_queue.select = cartSlot
+            end
+            cartJob.usedSlots[cartSlot] = true
+            cartJob.placedCarts = cartJob.placedCarts + 1
+            aimAt(cartJob.railCell + Vector3.new(0.5, 0.06, 0.5))
+            u116_queue.attacks = 0
+            if u224_targets then table.clear(u224_targets) end
+            u116_queue.uses = 1
+            recordRMB()
+            if cartJob.placedCarts >= cartJob.targetCarts then
+                cartJob.step = "detonate"
+            end
+            return true
+        else
+            cartJob.step = "detonate"
+        end
+    end
+    if cartJob.step == "detonate" then
+        local mode = Cfg.CartDetonateMode or "Auto"
+        local bowSlot = findHotbarSlot(function(it) return it.id == "bow" end)
+        local bowItem = bowSlot and Hands.inv.hotbar[bowSlot]
+        local hasFlameBow = (bowItem ~= nil) and Hands.hasItem("arrow") and (Items.ench(bowItem, "flame") > 0 or mode == "Flame Bow")
+        local flintSlot = findHotbarSlot(function(it) return it.id == "flint_and_steel" end)
+        local useFlameBow = (mode == "Flame Bow" and bowSlot and Hands.hasItem("arrow"))
+            or (mode == "Auto" and hasFlameBow)
+        local useFlint = (not useFlameBow) and (mode == "Flint & Steel" or mode == "Auto") and (flintSlot ~= nil)
+        if useFlameBow then
+            if Hands.inv.selected ~= bowSlot then
+                u116_queue.select = bowSlot
+            end
+            aimAt(cartJob.railCell + Vector3.new(0.5, 0.35, 0.5))
+            u116_queue.attacks = 0
+            u116_queue.uses = 1
+            recordRMB()
+            cartJob.step = "bowHold"
+            cartJob.bowStartTick = Controller.tickCount
+            return true
+        elseif useFlint then
+            local firePt = findIgniteHitPoint(eye, cartJob.railCell)
+            if firePt then
+                if Hands.inv.selected ~= flintSlot then
+                    u116_queue.select = flintSlot
+                end
+                aimAt(firePt)
+                u116_queue.attacks = 0
+                u116_queue.uses = 1
+                recordRMB()
+                pendingRestoreSlot = getBestSwordSlot() or cartJob.origSlot
+                pendingRestoreTick = Controller.tickCount + 1
+                cartJob = nil
+                return true
+            end
+        end
+        local _, cartPt = findNearestCartPivot(eye, 4.5)
+        aimAt(cartPt or (cartJob.railCell + Vector3.new(0.5, 0.35, 0.5)))
+        local swSlot = getBestSwordSlot() or cartJob.origSlot
+        if swSlot and Hands.inv.selected ~= swSlot then
+            u116_queue.select = swSlot
+        end
+        if u224_targets then table.clear(u224_targets) end
+        u116_queue.attacks = 1
+        recordLMB()
+        cartJob = nil
+        return true
+    end
+    if cartJob.step == "bowHold" then
+        aimAt(cartJob.railCell + Vector3.new(0.5, 0.35, 0.5))
+        local heldTicks = Controller.tickCount - cartJob.bowStartTick
+        if heldTicks >= (tonumber(Cfg.CartBowTicks) or 5) then
+            pcall(Hands.stopUsing, false)
+            pendingRestoreSlot = getBestSwordSlot() or cartJob.origSlot
+            pendingRestoreTick = Controller.tickCount + 1
+            cartJob = nil
+        end
+        return true
+    end
+    cartJob = nil
+    return false
+end
+local lastSpearLungeTick = -100
+local manualSpearLungeUntil = 0
+local function isMovingInputDown()
+    return UserInputService:IsKeyDown(Enum.KeyCode.W)
+        or UserInputService:IsKeyDown(Enum.KeyCode.A)
+        or UserInputService:IsKeyDown(Enum.KeyCode.S)
+        or UserInputService:IsKeyDown(Enum.KeyCode.D)
+        or UserInputService:IsKeyDown(Enum.KeyCode.Space)
+end
+local function tryAutoSpearLunge(state, reach)
+    if not state or not u116_queue or not isAlive() then return false end
+    local char = LocalPlayer.Character
+    if not char or not char:GetAttribute("CanSprint") then return false end
+    if state.inWater or state.gliding then return false end
+    local manualActive = os.clock() <= manualSpearLungeUntil
+    if not Cfg.AutoSpearLunge and not manualActive then return false end
+    if not manualActive and Hands.using ~= nil then return false end
+    if Controller.tickCount - lastSpearLungeTick < 4 then return false end
+    local spearSlot = getBestLungeSpearSlot()
+    if not spearSlot then
+        manualSpearLungeUntil = 0
+        return false
+    end
+    local origSlot = Hands.inv.selected
+    local holdingSpear = (origSlot == spearSlot)
+    local mode = Cfg.SpearLungeMode or "Hold Spear"
+    if not manualActive then
+        if mode == "Hold Spear" then
+            if not holdingSpear and not Cfg.SpearAutoSwap then return false end
+            if not holdingSpear then
+                return false
+            end
+            if not isMovingInputDown() and not state.sprinting then
+                return false
+            end
+        elseif mode == "On Target Chase" then
+            if not holdingSpear and not Cfg.SpearAutoSwap then return false end
+            local chaseMax = math.max(5, tonumber(Cfg.SpearChaseRange) or 18)
+            local nearest = getClosestTarget(chaseMax, 360)
+            if not nearest then return false end
+            local eye = Controller.eye()
+            local dist = eye and ((nearest.feet + Vector3.new(0, 1, 0)) - eye).Magnitude or 0
+            if dist <= ((reach or Config.REACH) + 1.2) then
+                return false
+            end
+        elseif mode == "Always" then
+            if not holdingSpear and not Cfg.SpearAutoSwap then return false end
+        end
+    else
+        if not holdingSpear and not Cfg.SpearAutoSwap then
+            manualSpearLungeUntil = 0
+            return false
+        end
+    end
+    if getEffectiveAttackStrength() < 1 then
+        return false
+    end
+    if not holdingSpear then
+        u116_queue.select = spearSlot
+        if Cfg.SpearAutoSwap then
+            pendingRestoreSlot = getBestSwordSlot() or origSlot
+            pendingRestoreTick = Controller.tickCount + 1
+        end
+    end
+    if savedYaw == nil then
+        savedYaw = Controller.yaw
+        savedPitch = Controller.pitch
+    end
+    if (mode == "On Target Chase" or manualActive) and Cfg.SpearAimTarget then
+        local chaseMax = math.max(5, tonumber(Cfg.SpearChaseRange) or 18)
+        local chaseTarget = getClosestTarget(chaseMax, manualActive and 110 or 360)
+        local eye = Controller.eye()
+        if chaseTarget and eye then
+            local _, aimYaw, _ = getBestAimPointAndAngles(eye, chaseTarget)
+            Controller.yaw = aimYaw
+        end
+    end
+    if Cfg.SpearFlatAim then
+        Controller.pitch = 0
+    end
+    if u224_targets then
+        table.clear(u224_targets)
+    end
+    u116_queue.attacks = 1
+    recordLMB()
+    lastSpearLungeTick = Controller.tickCount
+    manualSpearLungeUntil = 0
+    return true
+end
+local lastSplashPotTick = -100
+local lastSwordJumpResetTick = -100
+local lastCritHopTick = -100
+local autoGappleEating = false
+local autoShieldActive = false
+local function getLocalHealthPair()
+    local char = LocalPlayer.Character
+    local hp = (char and tonumber(char:GetAttribute("Health"))) or tonumber(LocalPlayer:GetAttribute("Health")) or 20
+    local abs = (char and tonumber(char:GetAttribute("Absorption"))) or tonumber(LocalPlayer:GetAttribute("Absorption")) or 0
+    return hp, abs, hp + abs, char
+end
+local function getLocalEffectsMap()
+    local char = LocalPlayer.Character
+    local raw = LocalPlayer:GetAttribute("Effects") or (char and char:GetAttribute("Effects"))
+    if type(raw) == "string" and raw ~= "" and Effects and type(Effects.decode) == "function" then
+        local ok, decoded = pcall(Effects.decode, raw)
+        if ok and type(decoded) == "table" then
+            return decoded
+        end
+    elseif type(raw) == "table" then
+        return raw
+    end
+    return {}
+end
+local function findSplashPotionSlot(potionNames)
+    for i = 1, 9 do
+        local it = Hands.inv.hotbar[i]
+        if it and it.id == "splash_potion" and type(it.potion) == "string" then
+            for _, targetPot in ipairs(potionNames) do
+                if it.potion == targetPot then
+                    return i, it
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+local function stepSwordSurvival(state)
+    if Hands.using and Hands.using.kind == "eat" then
+        return true
+    end
+    if autoGappleEating then
+        autoGappleEating = false
+        local swordSlot = getBestSwordSlot()
+        if swordSlot and Hands.inv.selected ~= swordSlot and u116_queue and not u116_queue.select then
+            u116_queue.select = swordSlot
+        end
+    end
+    if state.gliding or not u116_queue then
+        return false
+    end
+    local _, _, totalHP, char = getLocalHealthPair()
+    if Cfg.AutoGapple and totalHP <= (tonumber(Cfg.AutoGappleHP) or 11) and not Hands.using then
+        local gapSlot, gapItem = findHotbarSlot(function(it)
+            return it.id == "enchanted_golden_apple"
+        end)
+        if not gapSlot then
+            gapSlot, gapItem = findHotbarSlot(function(it)
+                return it.id == "golden_apple"
+            end)
+        end
+        if gapSlot and (not gapItem or Hands.cooldownFraction(gapItem.id) <= 0) then
+            if Hands.inv.selected ~= gapSlot then
+                u116_queue.select = gapSlot
+            end
+            u116_queue.uses = 1
+            autoGappleEating = true
+            recordRMB()
+            return true
+        end
+    end
+    if Cfg.AutoBuffPots and not Hands.using and (Controller.tickCount - lastSplashPotTick >= 10) then
+        local myEffects = getLocalEffectsMap()
+        local potSlot = nil
+        if totalHP <= 12 then
+            potSlot = findSplashPotionSlot({ "strong_healing", "healing", "instant_health" })
+        end
+        if not potSlot and not myEffects.speed then
+            potSlot = findSplashPotionSlot({ "strong_swiftness", "swiftness", "speed" })
+        end
+        if not potSlot and not myEffects.strength then
+            local nearEnemy = getClosestTarget(14, 360)
+            if nearEnemy then
+                potSlot = findSplashPotionSlot({ "strong_strength", "strength" })
+            end
+        end
+        if not potSlot and ((char and (char:GetAttribute("Fire") or 0) > 0) or (LocalPlayer:GetAttribute("Fire") or 0) > 0) and not myEffects.fire_resistance then
+            potSlot = findSplashPotionSlot({ "long_fire_resistance", "fire_resistance" })
+        end
+        if potSlot then
+            local origSlot = Hands.inv.selected
+            if origSlot ~= potSlot then
+                u116_queue.select = potSlot
+                pendingRestoreSlot = getBestSwordSlot() or origSlot
+                pendingRestoreTick = Controller.tickCount + 1
+            end
+            if savedYaw == nil then
+                savedYaw = Controller.yaw
+                savedPitch = Controller.pitch
+            end
+            Controller.pitch = -1.55
+            u116_queue.uses = 1
+            recordRMB()
+            lastSplashPotTick = Controller.tickCount
+            return true
+        end
+    end
+    return false
+end
+local function stepSwordJumpReset(state)
+    if not Cfg.SwordJumpReset then return false end
+    if (Controller.tickCount - lastLocalKbTick) > 1 or (Controller.tickCount - lastSwordJumpResetTick) < 3 then
+        return false
+    end
+    if state.onGround and not state.inWater and not state.gliding then
+        if getClosestTarget(10, 360) then
+            pcall(Input.setVirtual, "jump", true)
+            virtualJumpReleaseTick = Controller.tickCount + 1
+            lastSwordJumpResetTick = Controller.tickCount
+            return true
+        end
+    end
+    return false
+end
+local function stepSwordCritHop(state, reach)
+    if not Cfg.SwordCritHop then return false end
+    if not state.onGround or state.inWater or state.gliding or Hands.using then return false end
+    if (Controller.tickCount - lastCritHopTick) < 6 then return false end
+    local swordSlot = getBestSwordSlot()
+    local held = Hands.held()
+    local heldDef = held and Items.def(held)
+    if not swordSlot and not (heldDef and heldDef.kind == "sword") then
+        return false
+    end
+    local critTarget = getClosestTarget(reach + 1.0, 140)
+    if not critTarget then return false end
+    local effCharge = getEffectiveAttackStrength()
+    if effCharge >= 0.68 and getTargetHurtRemaining(critTarget) <= 4 then
+        pcall(Input.setVirtual, "jump", true)
+        virtualJumpReleaseTick = Controller.tickCount + 1
+        lastCritHopTick = Controller.tickCount
+        return true
+    end
+    return false
+end
+local function getCrosshairTarget(maxReach)
+    local eye = Controller.eye()
+    if not eye then return nil end
+    local look = Controller.look()
+    local bestT, bestD = nil, maxReach
+    for _, t in ipairs(World.targets()) do
+        if not Cfg.KillAuraTargetDummies and t.model.Parent == World.folder.Dummies then
+            continue
+        end
+        local hitDist = origRayBox(eye, look, t.feet, t.height, 0, t.width)
+        if hitDist and hitDist <= bestD then
+            local wall = World.blockRay(eye, look, hitDist, {"Solid"})
+            local web = World.blockRay(eye, look, 4.5, {"Webs"})
+            local webBlocked = (web ~= nil and web.dist <= hitDist)
+            if (not wall or wall.dist >= hitDist) and not webBlocked then
+                bestD = hitDist
+                bestT = t
+            end
+        end
+    end
+    return bestT
+end
+local function stepSwordTriggerBot(reach)
+    if not Cfg.SwordTriggerBot then return false end
+    if Hands.using and Hands.using.kind == "eat" then return false end
+    local t = getCrosshairTarget(reach)
+    if t then
+        return queueNativeAttack(t, false, true)
+    end
+    return false
+end
+local function stepAutoShield(state, reach)
+    if not Cfg.AutoShieldBlock then
+        if autoShieldActive and Hands.using and Hands.using.kind == "shield" then
+            autoShieldActive = false
+            pcall(Hands.stopUsing, false)
+        end
+        return false
+    end
+    if state.gliding or (Hands.using and Hands.using.kind ~= "shield") then
+        return false
+    end
+    local hasOffhandShield = (Hands.inv.offhand and Hands.inv.offhand.id == "shield")
+    local held = Hands.held()
+    local hasMainShield = (held and held.id == "shield")
+    if not hasOffhandShield and not hasMainShield then
+        return false
+    end
+    local threat, _ = getClosestTarget(4.8, 360)
+    local readyToSwing = threat ~= nil and (getEffectiveAttackStrength() >= 0.85) and (not Cfg.SwordIFrameSync or getTargetHurtRemaining(threat) <= 0)
+    local needBlock = threat ~= nil and not readyToSwing and (Hands.cooldownFraction("shield") <= 0)
+    if needBlock then
+        if not Hands.using and u116_queue then
+            u116_queue.uses = 1
+            autoShieldActive = true
+            recordRMB()
+            return true
+        end
+    elseif autoShieldActive and Hands.using and Hands.using.kind == "shield" then
+        autoShieldActive = false
+        pcall(Hands.stopUsing, false)
+    end
+    return false
+end
+local lastWaterClutchTick = 0
+local function onPreTick(state)
+    if virtualJumpReleaseTick and Controller.tickCount >= virtualJumpReleaseTick then
+        virtualJumpReleaseTick = nil
+        pcall(Input.setVirtual, "jump", false)
+    end
+    if not state or not isAlive() then return end
+    if wTapResetTick and Controller.tickCount >= wTapResetTick then
+        wTapResetTick = nil
+        state.sprinting = false
+    end
+    stepSwordJumpReset(state)
+    if Cfg.AntiKB then
+        local okQ, kbQueue = pcall(debug.getupvalue, Controller.applyLocalPush, 1)
+        if okQ and type(kbQueue) == "table" then
+            for i = #kbQueue, 1, -1 do
+                local entry = kbQueue[i]
+                if entry and entry.kind == "kb" then
+                    if Cfg.KBHorizontal <= 0 then
+                        table.remove(kbQueue, i)
+                    else
+                        entry.s = entry.s * (Cfg.KBHorizontal / 100)
+                    end
+                end
+            end
+        end
+    end
+    if pendingRestoreSlot and Controller.tickCount >= pendingRestoreTick and u116_queue then
+        if not u116_queue.select and Hands.inv.selected ~= pendingRestoreSlot then
+            u116_queue.select = pendingRestoreSlot
+        end
+        pendingRestoreSlot = nil
+    end
+    if wantWindJump and u116_queue then
+        wantWindJump = false
+        local wcSlot = findHotbarSlot(function(it) return it.id == "wind_charge" end)
+        local inOffhand = Hands.inv.offhand and Hands.inv.offhand.id == "wind_charge"
+        if wcSlot or inOffhand then
+            local prevSlot = Hands.inv.selected
+            if wcSlot and prevSlot ~= wcSlot then
+                u116_queue.select = wcSlot
+                pendingRestoreSlot = getBestSwordSlot() or prevSlot
+                pendingRestoreTick = Controller.tickCount + 1
+            end
+            if state.onGround then
+                pcall(Input.setVirtual, "jump", true)
+                virtualJumpReleaseTick = Controller.tickCount + 1
+            end
+            if savedYaw == nil then
+                savedYaw = Controller.yaw
+                savedPitch = Controller.pitch
+            end
+            Controller.pitch = -1.55
+            u116_queue.attacks = 0
+            if u224_targets then table.clear(u224_targets) end
+            u116_queue.uses = (u116_queue.uses or 0) + 1
+            recordRMB()
+            return
+        end
+    end
+    local char = LocalPlayer.Character
+    if char then
+        if Cfg.SpeedMultEnabled then
+            char:SetAttribute("SpeedMult", Cfg.SpeedMultValue)
+        end
+        if Cfg.JumpBoostEnabled then
+            char:SetAttribute("JumpBoost", Cfg.JumpBoostValue)
+        end
+        if Cfg.NoAttackerSlow then
+            char:SetAttribute("CanSprint", true)
+        end
+    end
+    if Cfg.InfElytraRocket and state.gliding then
+        state.rocketTicks = math.max(state.rocketTicks or 0, 10)
+    end
+    if stepAutoTotem() then
+        return
+    end
+    if Cfg.AutoWaterClutch and not Cfg.NoFallDamage and state.fallDistance > 10 and not state.gliding and Controller.tickCount - lastWaterClutchTick > 10 and u116_queue then
+        local groundHit = World.blockRay(state.pos + Vector3.new(0, 0.5, 0), Vector3.new(0, -1, 0), 3.5, {"Solid"})
+        if groundHit then
+            local wbSlot = findHotbarSlot(function(it) return it.id == "water_bucket" or it.id == "salmon_bucket" end)
+            if wbSlot then
+                lastWaterClutchTick = Controller.tickCount
+                local prev = Hands.inv.selected
+                if prev ~= wbSlot then
+                    u116_queue.select = wbSlot
+                    pendingRestoreSlot = prev
+                    pendingRestoreTick = Controller.tickCount + 1
+                end
+                if savedYaw == nil then
+                    savedYaw = Controller.yaw
+                    savedPitch = Controller.pitch
+                end
+                Controller.pitch = -1.55
+                u116_queue.attacks = 0
+                if u224_targets then table.clear(u224_targets) end
+                u116_queue.uses = (u116_queue.uses or 0) + 1
+                recordRMB()
+                return
+            end
+        end
+    end
+    if stepSwordSurvival(state) then
+        return
+    end
+    if stepTNTCartJob() then
+        return
+    end
+    if Cfg.TNTCartAura and not state.gliding then
+        if triggerTNTCartBurst(false) and stepTNTCartJob() then
+            return
+        end
+    end
+    local hasCreatorPerms = (LocalPlayer:GetAttribute("CreatorPanel") == true) or (LocalPlayer:GetAttribute("Operator") == true)
+    local reach = (Cfg.ReachEnabled and hasCreatorPerms) and (tonumber(Cfg.ReachValue) or Config.REACH) or Config.REACH
+    local isFallingForMace = (state.fallDistance > Combat.SMASH_MIN_FALL) or Cfg.MaceFallSpoof
+    local hasMaceInHotbar = getBestMaceSlot(state.fallDistance) ~= nil
+    if Cfg.AutoMace and Cfg.MaceElytraDive and state.gliding and state.fallDistance > 2.0 and hasMaceInHotbar then
+        local diveTarget = getClosestTarget(reach + 2.5, 360)
+        if diveTarget then
+            if swapChestArmor(false, true) then
+                return
+            end
+        end
+    end
+    if Cfg.AutoMace and hasMaceInHotbar and isFallingForMace and not state.gliding then
+        local maceTarget = getClosestTarget(reach, 360)
+        if maceTarget then
+            if queueNativeAttack(maceTarget, true) then
+                return
+            end
+        end
+    end
+    if tryAutoSpearLunge(state, reach) then
+        return
+    end
+    local heldNow = Hands.held()
+    local heldDef = heldNow and Items.def(heldNow)
+    local spearBreachReady = wantsBreachSwapForKind("spear") and (getBestBreachMaceSlot() ~= nil)
+    local can45Reach = Cfg.SwordReachSwap or spearBreachReady
+    local effectiveReach = (can45Reach and heldDef and heldDef.kind == "spear") and math.max(reach, 4.45) or reach
+    if not state.gliding then
+        stepSwordCritHop(state, effectiveReach)
+        if can45Reach and (Cfg.KillAura or Cfg.SwordTriggerBot) and heldDef and heldDef.kind == "sword" and u116_queue and not u116_queue.select then
+            local spearSlot = getAnySpearSlot()
+            if spearSlot then
+                local closeT = getClosestTarget(reach, 120)
+                if not closeT then
+                    local midT = getClosestTarget(4.45, 120)
+                    if midT then
+                        u116_queue.select = spearSlot
+                        return
+                    end
+                end
+            end
+        end
+    end
+    local attacked = false
+    if Cfg.KillAura and not state.gliding then
+        local kaTarget = getClosestTarget(effectiveReach, Cfg.KillAuraFOV)
+        if kaTarget then
+            attacked = queueNativeAttack(kaTarget, false)
+        end
+    elseif Cfg.SwordTriggerBot and not state.gliding then
+        attacked = stepSwordTriggerBot(effectiveReach)
+    end
+    if not attacked and not state.gliding and u116_queue and (u116_queue.attacks or 0) > 0 and not u116_queue.select then
+        if heldDef and wantsBreachSwapForKind(heldDef.kind) then
+            local breachSlot = getBestBreachMaceSlot()
+            local origSlot = Hands.inv.selected
+            if breachSlot and breachSlot ~= origSlot and getEffectiveAttackStrength() >= 0.85 then
+                u116_queue.select = breachSlot
+                if heldDef.kind == "spear" and Cfg.BreachSwapMode == "Spear -> Breach (4.5m)" then
+                    pendingRestoreSlot = origSlot
+                elseif Cfg.MaceAutoReturnSword then
+                    pendingRestoreSlot = getBestSwordSlot() or origSlot
+                else
+                    pendingRestoreSlot = origSlot
+                end
+                pendingRestoreTick = Controller.tickCount + 1
+                attacked = true
+            end
+        end
+    end
+    if not attacked then
+        stepAutoShield(state, effectiveReach)
+    end
+end
+local function onPostTick(state)
+    if savedYaw ~= nil and savedPitch ~= nil then
+        Controller.yaw = savedYaw
+        Controller.pitch = savedPitch
+        savedYaw = nil
+        savedPitch = nil
+    end
+    if state and Cfg.NoFallDamage then
+        state.fallDistance = 0
+        state.landed = nil
+        state.wallDamage = nil
+    end
+end
+table.insert(Controller.beforeTick, 1, onPreTick)
+table.insert(Controller.onTick, onPostTick)
+local origOverlaps = Physics.overlaps
+Physics.overlaps = function(pos, w, h, kind)
+    if Cfg.NoWebSlow and kind == "web" then
+        return false
+    end
+    return origOverlaps(pos, w, h, kind)
+end
+World.rayBox = function(origin, dir, feet, height, pad, width)
+    local extra = tonumber(Cfg.HitboxExpand) or 0
+    if extra <= 0 then
+        return origRayBox(origin, dir, feet, height, pad, width)
+    end
+    return origRayBox(origin, dir, feet, height, pad, (tonumber(width) or Config.WIDTH) + extra)
+end
+local keystrokesGui = nil
+local ksScaleObj = nil
+local ksContainer = nil
+local ksWidgets = {}
+local inputBeganConn = nil
+pcall(function()
+    local pg = LocalPlayer:WaitForChild("PlayerGui")
+    local oldKs = pg:FindFirstChild("MourierKeystrokesHUD")
+    if oldKs then oldKs:Destroy() end
+    keystrokesGui = Instance.new("ScreenGui")
+    keystrokesGui.Name = "MourierKeystrokesHUD"
+    keystrokesGui.ResetOnSpawn = false
+    keystrokesGui.IgnoreGuiInset = true
+    keystrokesGui.DisplayOrder = 15
+    keystrokesGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    keystrokesGui.Parent = pg
+    ksContainer = Instance.new("Frame")
+    ksContainer.Name = "KeystrokesContainer"
+    ksContainer.BackgroundTransparency = 1
+    ksContainer.Position = savedKsPos and UDim2.new(savedKsPos.xs, savedKsPos.xo, savedKsPos.ys, savedKsPos.yo) or UDim2.new(0, 18, 0.5, -105)
+    ksContainer.Size = UDim2.fromOffset(170, 222)
+    ksContainer.Parent = keystrokesGui
+    ksScaleObj = Instance.new("UIScale")
+    ksScaleObj.Scale = Cfg.KeystrokesScale
+    ksScaleObj.Parent = ksContainer
+    local dragging = false
+    local dragInput, dragStart, startPos
+    ksContainer.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = ksContainer.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    local p = ksContainer.Position
+                    savedKsPos = { xs = p.X.Scale, xo = p.X.Offset, ys = p.Y.Scale, yo = p.Y.Offset }
+                    scheduleSave()
+                end
+            end)
+        end
+    end)
+    ksContainer.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            ksContainer.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    local badgeFrame = Instance.new("Frame")
+    badgeFrame.Name = "BrandBadge"
+    badgeFrame.Position = UDim2.fromOffset(0, 0)
+    badgeFrame.Size = UDim2.fromOffset(170, 22)
+    badgeFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
+    badgeFrame.BackgroundTransparency = 0.32
+    badgeFrame.BorderSizePixel = 0
+    badgeFrame.Parent = ksContainer
+    local badgeCorner = Instance.new("UICorner")
+    badgeCorner.CornerRadius = UDim.new(0, 5)
+    badgeCorner.Parent = badgeFrame
+    local badgeStroke = Instance.new("UIStroke")
+    badgeStroke.Thickness = 1.2
+    badgeStroke.Color = Color3.fromRGB(165, 95, 255)
+    badgeStroke.Transparency = 0.25
+    badgeStroke.Parent = badgeFrame
+    local badgeLabel = Instance.new("TextLabel")
+    badgeLabel.BackgroundTransparency = 1
+    badgeLabel.Size = UDim2.fromScale(1, 1)
+    badgeLabel.Font = Enum.Font.Code
+    badgeLabel.Text = "MOURIER CLIENT"
+    badgeLabel.TextSize = 12
+    badgeLabel.TextColor3 = Color3.fromRGB(240, 240, 255)
+    badgeLabel.TextStrokeTransparency = 0.35
+    badgeLabel.Parent = badgeFrame
+    ksWidgets.badgeStroke = badgeStroke
+    ksWidgets.badgeLabel = badgeLabel
+    local function createKeyBox(name, titleText, subText, x, y, w, h)
+        local frame = Instance.new("Frame")
+        frame.Name = name
+        frame.Position = UDim2.fromOffset(x, y)
+        frame.Size = UDim2.fromOffset(w, h)
+        frame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+        frame.BackgroundTransparency = 0.35
+        frame.BorderSizePixel = 0
+        frame.Parent = ksContainer
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = frame
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 1.2
+        stroke.Color = Color3.fromRGB(90, 90, 110)
+        stroke.Transparency = 0.45
+        stroke.Parent = frame
+        local mainLbl = Instance.new("TextLabel")
+        mainLbl.Name = "MainLabel"
+        mainLbl.BackgroundTransparency = 1
+        mainLbl.Font = Enum.Font.GothamBold
+        mainLbl.Text = titleText
+        mainLbl.TextColor3 = Color3.fromRGB(245, 245, 255)
+        mainLbl.TextStrokeTransparency = 0.5
+        if subText then
+            mainLbl.Position = UDim2.fromOffset(0, 4)
+            mainLbl.Size = UDim2.new(1, 0, 0, 20)
+            mainLbl.TextSize = 14
+        else
+            mainLbl.Position = UDim2.fromOffset(0, 0)
+            mainLbl.Size = UDim2.fromScale(1, 1)
+            mainLbl.TextSize = (name == "SPACE") and 12 or 16
+        end
+        mainLbl.Parent = frame
+        local subLbl = nil
+        if subText then
+            subLbl = Instance.new("TextLabel")
+            subLbl.Name = "SubLabel"
+            subLbl.BackgroundTransparency = 1
+            subLbl.Position = UDim2.fromOffset(0, 22)
+            subLbl.Size = UDim2.new(1, 0, 0, 16)
+            subLbl.Font = Enum.Font.Code
+            subLbl.Text = subText
+            subLbl.TextSize = 11
+            subLbl.TextColor3 = Color3.fromRGB(190, 190, 210)
+            subLbl.TextStrokeTransparency = 0.6
+            subLbl.Parent = frame
+        end
+        local widget = {
+            frame = frame,
+            stroke = stroke,
+            mainLbl = mainLbl,
+            subLbl = subLbl,
+            alpha = 0,
+        }
+        ksWidgets[name] = widget
+        return widget
+    end
+    createKeyBox("W", "W", nil, 58, 28, 54, 50)
+    createKeyBox("A", "A", nil, 0, 82, 54, 50)
+    createKeyBox("S", "S", nil, 58, 82, 54, 50)
+    createKeyBox("D", "D", nil, 116, 82, 54, 50)
+    createKeyBox("LMB", "LMB", "0 CPS", 0, 136, 83, 44)
+    createKeyBox("RMB", "RMB", "0 CPS", 87, 136, 83, 44)
+    createKeyBox("SPACE", "━━━━━", nil, 0, 184, 170, 28)
+    local targetHudFrame = Instance.new("Frame")
+    targetHudFrame.Name = "TargetHUDContainer"
+    targetHudFrame.Visible = false
+    targetHudFrame.Position = savedTargetHudPos and UDim2.new(savedTargetHudPos.xs, savedTargetHudPos.xo, savedTargetHudPos.ys, savedTargetHudPos.yo) or UDim2.new(0.5, 42, 0.5, 22)
+    targetHudFrame.Size = UDim2.fromOffset(224, 72)
+    targetHudFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
+    targetHudFrame.BackgroundTransparency = 0.24
+    targetHudFrame.BorderSizePixel = 0
+    targetHudFrame.Parent = keystrokesGui
+    local thCorner = Instance.new("UICorner")
+    thCorner.CornerRadius = UDim.new(0, 7)
+    thCorner.Parent = targetHudFrame
+    local thStroke = Instance.new("UIStroke")
+    thStroke.Thickness = 1.35
+    thStroke.Color = Color3.fromRGB(165, 95, 255)
+    thStroke.Transparency = 0.25
+    thStroke.Parent = targetHudFrame
+    local thDragging = false
+    local thDragInput, thDragStart, thStartPos
+    targetHudFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            thDragging = true
+            thDragStart = input.Position
+            thStartPos = targetHudFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    thDragging = false
+                    local p = targetHudFrame.Position
+                    savedTargetHudPos = { xs = p.X.Scale, xo = p.X.Offset, ys = p.Y.Scale, yo = p.Y.Offset }
+                    scheduleSave()
+                end
+            end)
+        end
+    end)
+    targetHudFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            thDragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == thDragInput and thDragging then
+            local delta = input.Position - thDragStart
+            targetHudFrame.Position = UDim2.new(
+                thStartPos.X.Scale,
+                thStartPos.X.Offset + delta.X,
+                thStartPos.Y.Scale,
+                thStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    local thName = Instance.new("TextLabel")
+    thName.BackgroundTransparency = 1
+    thName.Position = UDim2.fromOffset(10, 6)
+    thName.Size = UDim2.fromOffset(145, 18)
+    thName.Font = Enum.Font.GothamBold
+    thName.TextSize = 13
+    thName.TextXAlignment = Enum.TextXAlignment.Left
+    thName.TextColor3 = Color3.fromRGB(248, 248, 255)
+    thName.Text = "Target [Kit]"
+    thName.Parent = targetHudFrame
+    local thDist = Instance.new("TextLabel")
+    thDist.BackgroundTransparency = 1
+    thDist.Position = UDim2.fromOffset(156, 6)
+    thDist.Size = UDim2.fromOffset(58, 18)
+    thDist.Font = Enum.Font.Code
+    thDist.TextSize = 12
+    thDist.TextXAlignment = Enum.TextXAlignment.Right
+    thDist.TextColor3 = Color3.fromRGB(190, 210, 255)
+    thDist.Text = "0.0m"
+    thDist.Parent = targetHudFrame
+    local thBarBg = Instance.new("Frame")
+    thBarBg.Position = UDim2.fromOffset(10, 29)
+    thBarBg.Size = UDim2.fromOffset(204, 15)
+    thBarBg.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    thBarBg.BorderSizePixel = 0
+    thBarBg.ClipsDescendants = true
+    thBarBg.Parent = targetHudFrame
+    local thBarBgCorner = Instance.new("UICorner")
+    thBarBgCorner.CornerRadius = UDim.new(0, 4)
+    thBarBgCorner.Parent = thBarBg
+    local thHpFill = Instance.new("Frame")
+    thHpFill.Size = UDim2.fromScale(1, 1)
+    thHpFill.BackgroundColor3 = Color3.fromRGB(70, 220, 115)
+    thHpFill.BorderSizePixel = 0
+    thHpFill.Parent = thBarBg
+    local thAbsFill = Instance.new("Frame")
+    thAbsFill.Size = UDim2.fromScale(0, 0.25)
+    thAbsFill.Position = UDim2.fromScale(0, 0.75)
+    thAbsFill.BackgroundColor3 = Color3.fromRGB(255, 205, 55)
+    thAbsFill.BorderSizePixel = 0
+    thAbsFill.Parent = thBarBg
+    local thHpLbl = Instance.new("TextLabel")
+    thHpLbl.BackgroundTransparency = 1
+    thHpLbl.Size = UDim2.fromScale(1, 1)
+    thHpLbl.Font = Enum.Font.GothamBold
+    thHpLbl.TextSize = 11
+    thHpLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    thHpLbl.TextStrokeTransparency = 0.25
+    thHpLbl.Text = "20.0 / 20"
+    thHpLbl.ZIndex = 3
+    thHpLbl.Parent = thBarBg
+    local thStatus = Instance.new("TextLabel")
+    thStatus.BackgroundTransparency = 1
+    thStatus.Position = UDim2.fromOffset(10, 49)
+    thStatus.Size = UDim2.fromOffset(204, 17)
+    thStatus.Font = Enum.Font.Code
+    thStatus.TextSize = 11
+    thStatus.TextXAlignment = Enum.TextXAlignment.Left
+    thStatus.TextColor3 = Color3.fromRGB(215, 215, 230)
+    thStatus.Text = "READY"
+    thStatus.Parent = targetHudFrame
+    ksWidgets.TargetHUD = {
+        frame = targetHudFrame,
+        stroke = thStroke,
+        nameLbl = thName,
+        distLbl = thDist,
+        hpFill = thHpFill,
+        absFill = thAbsFill,
+        hpLbl = thHpLbl,
+        statusLbl = thStatus,
+    }
+end)
+inputBeganConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed and UserInputService.MouseBehavior == Enum.MouseBehavior.Default then
+        return
+    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        recordLMB()
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        recordRMB()
+    end
+end)
+local function getCPS(clickTable, now)
+    for i = #clickTable, 1, -1 do
+        if now - clickTable[i] > 1.0 then
+            table.remove(clickTable, i)
+        end
+    end
+    return #clickTable
+end
+local smoothFPS = 60
+local function updateKeystrokes(dt)
+    if not keystrokesGui or not ksContainer then return end
+    keystrokesGui.Enabled = (Cfg.KeystrokesHUD == true) or (Cfg.TargetHUD == true)
+    ksContainer.Visible = (Cfg.KeystrokesHUD == true)
+    if not Cfg.KeystrokesHUD then return end
+    if ksScaleObj then
+        ksScaleObj.Scale = tonumber(Cfg.KeystrokesScale) or 1.0
+    end
+    local now = os.clock()
+    if dt and dt > 0 then
+        smoothFPS = smoothFPS * 0.92 + (1 / dt) * 0.08
+    end
+    local accentColor = Cfg.KeystrokesRainbow
+        and Color3.fromHSV((now * 0.18) % 1, 0.72, 1.0)
+        or Color3.fromRGB(165, 95, 255)
+    if ksWidgets.badgeStroke then
+        ksWidgets.badgeStroke.Color = accentColor
+    end
+    if ksWidgets.badgeLabel then
+        ksWidgets.badgeLabel.Text = string.format("MOURIER CLIENT • %d FPS", math.clamp(math.round(smoothFPS), 1, 999))
+    end
+    local lmbCount = getCPS(lmbClicks, now)
+    local rmbCount = getCPS(rmbClicks, now)
+    local wDown = UserInputService:IsKeyDown(Enum.KeyCode.W) or Input.isDown("forward")
+    local aDown = UserInputService:IsKeyDown(Enum.KeyCode.A) or Input.isDown("left")
+    local sDown = UserInputService:IsKeyDown(Enum.KeyCode.S) or Input.isDown("back")
+    local dDown = UserInputService:IsKeyDown(Enum.KeyCode.D) or Input.isDown("right")
+    local spaceDown = UserInputService:IsKeyDown(Enum.KeyCode.Space) or Input.isDown("jump")
+    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or (now - (lmbClicks[#lmbClicks] or 0) < 0.065)
+    local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or (now - (rmbClicks[#rmbClicks] or 0) < 0.065)
+    local states = {
+        W = wDown,
+        A = aDown,
+        S = sDown,
+        D = dDown,
+        LMB = lmbDown,
+        RMB = rmbDown,
+        SPACE = spaceDown,
+    }
+    local lerpSpeed = math.clamp((dt or 0.016) * 20, 0, 1)
+    local idleBg = Color3.fromRGB(18, 18, 24)
+    local idleText = Color3.fromRGB(245, 245, 255)
+    local activeText = Color3.fromRGB(15, 15, 20)
+    local idleStroke = Color3.fromRGB(85, 85, 105)
+    for keyName, isPressed in pairs(states) do
+        local w = ksWidgets[keyName]
+        if w then
+            local targetAlpha = isPressed and 1 or 0
+            w.alpha = w.alpha + (targetAlpha - w.alpha) * lerpSpeed
+            local a = w.alpha
+            w.frame.BackgroundColor3 = idleBg:Lerp(accentColor, a)
+            w.frame.BackgroundTransparency = 0.35 - (0.15 * a)
+            w.stroke.Color = idleStroke:Lerp( Color3.fromRGB(255, 255, 255), a)
+            w.stroke.Transparency = 0.45 - (0.35 * a)
+            w.mainLbl.TextColor3 = idleText:Lerp(activeText, a)
+            if w.subLbl then
+                w.subLbl.TextColor3 = Color3.fromRGB(190, 190, 210):Lerp(activeText, a)
+            end
+        end
+    end
+    if ksWidgets.LMB then
+        ksWidgets.LMB.frame.Visible = (Cfg.KeystrokesShowCPS ~= false)
+        if ksWidgets.LMB.subLbl then
+            ksWidgets.LMB.subLbl.Text = string.format("%d CPS", lmbCount)
+        end
+    end
+    if ksWidgets.RMB then
+        ksWidgets.RMB.frame.Visible = (Cfg.KeystrokesShowCPS ~= false)
+        if ksWidgets.RMB.subLbl then
+            ksWidgets.RMB.subLbl.Text = string.format("%d CPS", rmbCount)
+        end
+    end
+    if ksWidgets.SPACE then
+        ksWidgets.SPACE.frame.Visible = (Cfg.KeystrokesShowSpace ~= false)
+        ksWidgets.SPACE.frame.Position = (Cfg.KeystrokesShowCPS ~= false)
+            and UDim2.fromOffset(0, 184)
+            or UDim2.fromOffset(0, 136)
+    end
+end
+local espFolder = nil
+local espCache = {}
+local function getEspFolder()
+    local cam = Workspace.CurrentCamera
+    if not cam then return nil end
+    if not espFolder or espFolder.Parent ~= cam then
+        local existing = cam:FindFirstChild("MC_MaceGodESP")
+        if existing then existing:Destroy() end
+        espFolder = Instance.new("Folder")
+        espFolder.Name = "MC_MaceGodESP"
+        espFolder.Parent = cam
+    end
+    return espFolder
+end
+local function clearESPFor(model)
+    local entry = espCache[model]
+    if entry then
+        pcall(function() if entry.hl then entry.hl:Destroy() end end)
+        pcall(function() if entry.bb then entry.bb:Destroy() end end)
+        espCache[model] = nil
+    end
+end
+local function stepSwordAimAssist(dt)
+    if not Cfg.SwordAimAssist or not isAlive() then return end
+    if UserInputService:GetFocusedTextBox() ~= nil then return end
+    local state = Controller.state
+    local eye = Controller.eye()
+    if not state or state.gliding or not eye then return end
+    local held = Hands.held()
+    local def = held and Items.def(held)
+    if not def or (def.kind ~= "sword" and def.kind ~= "axe" and def.kind ~= "spear") then
+        return
+    end
+    local aimRange = (Cfg.SwordReachSwap and def.kind == "spear") and 4.8 or 4.5
+    local target = getClosestTarget(aimRange, tonumber(Cfg.AimAssistFOV) or 70)
+    if not target then return end
+    local _, targetYaw, targetPitch = getBestAimPointAndAngles(eye, target)
+    local dyaw = (targetYaw - Controller.yaw + math.pi) % (2 * math.pi) - math.pi
+    local dpitch = math.clamp(targetPitch - Controller.pitch, -math.pi, math.pi)
+    local alpha = math.clamp((dt or 0.016) * (tonumber(Cfg.AimAssistSmooth) or 0.28) * 35, 0.01, 0.85)
+    Controller.yaw = Controller.yaw + dyaw * alpha
+    Controller.pitch = math.clamp(Controller.pitch + dpitch * alpha, -1.52, 1.52)
+end
+local function updateTargetHUD()
+    local th = ksWidgets.TargetHUD
+    if not th or not th.frame then return end
+    if not Cfg.TargetHUD or not isAlive() then
+        th.frame.Visible = false
+        return
+    end
+    local displayTarget = nil
+    local now = os.clock()
+    if lastSwordTarget and lastSwordTarget.model and lastSwordTarget.model.Parent and (now - lastSwordTargetAt) <= 4.0 then
+        local stillAlive = lastSwordTarget.model:GetAttribute("Alive")
+        if stillAlive ~= false then
+            displayTarget = lastSwordTarget
+        end
+    end
+    if not displayTarget then
+        displayTarget = getClosestTarget(8.0, 120)
+    end
+    if not displayTarget or not displayTarget.model then
+        th.frame.Visible = false
+        return
+    end
+    th.frame.Visible = true
+    local model = displayTarget.model
+    local hp = tonumber(model:GetAttribute("Health")) or 20
+    local maxHp = math.max(1, tonumber(model:GetAttribute("MaxHealth")) or 20)
+    local abs = tonumber(model:GetAttribute("Absorption")) or 0
+    local kit = tostring(model:GetAttribute("Kit") or "Player")
+    local nameStr = tostring(model:GetAttribute("DisplayName") or model.Name)
+    local eye = Controller.eye()
+    local centerPt = displayTarget.feet + Vector3.new(0, (displayTarget.height or 1.8) * 0.5, 0)
+    local dist = eye and (centerPt - eye).Magnitude or 0
+    th.nameLbl.Text = string.format("%s [%s]", nameStr, kit)
+    th.distLbl.Text = string.format("%.1fm", dist)
+    local hpPct = math.clamp(hp / maxHp, 0, 1)
+    th.hpFill.Size = UDim2.fromScale(hpPct, 1)
+    th.hpFill.BackgroundColor3 = Color3.fromRGB(235, 65, 65):Lerp(Color3.fromRGB(70, 225, 115), hpPct)
+    local absPct = math.clamp(abs / maxHp, 0, 1)
+    th.absFill.Visible = (abs > 0)
+    th.absFill.Size = UDim2.fromScale(absPct, 0.25)
+    th.hpLbl.Text = abs > 0
+        and string.format("%.1f / %d (+%.0f)", hp, maxHp, abs)
+        or string.format("%.1f / %d HP", hp, maxHp)
+    local tags = {}
+    if model:GetAttribute("Using") == "shield" then
+        table.insert(tags, "SHIELDING")
+    end
+    local remTicks = getTargetHurtRemaining(displayTarget)
+    if remTicks > 0 then
+        table.insert(tags, string.format("i-Frame %.2fs", remTicks * 0.05))
+    else
+        table.insert(tags, "HITTABLE")
+    end
+    local accentColor = Cfg.KeystrokesRainbow
+        and Color3.fromHSV((now * 0.18) % 1, 0.72, 1.0)
+        or Color3.fromRGB(165, 95, 255)
+    th.stroke.Color = accentColor
+    th.statusLbl.Text = table.concat(tags, "  •  ")
+end
+local function updateESP(dt)
+    pcall(updateKeystrokes, dt)
+    pcall(updateTargetHUD)
+    pcall(stepSwordAimAssist, dt)
+    local folder = getEspFolder()
+    if not folder then return end
+    local activeModels = {}
+    if visualsRigs then
+        for model, rig in pairs(visualsRigs) do
+            if model ~= LocalPlayer.Character and model.Parent and rig and rig.attrs then
+                if Cfg.AntiInvis then
+                    if rig.attrs.Invisible == true then
+                        rig.attrs.Invisible = false
+                    end
+                else
+                    rig.attrs.Invisible = model:GetAttribute("Invisible")
+                end
+            end
+        end
+    end
+    if not Cfg.ESP then
+        for m in pairs(espCache) do clearESPFor(m) end
+        return
+    end
+    for _, t in ipairs(World.targets()) do
+        local model = t.model
+        activeModels[model] = true
+        local entry = espCache[model]
+        if not entry then
+            local hl = Instance.new("Highlight")
+            hl.FillColor = Color3.fromRGB(255, 65, 65)
+            hl.OutlineColor = Color3.fromRGB(255, 220, 80)
+            hl.FillTransparency = 0.65
+            hl.OutlineTransparency = 0.1
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Adornee = model
+            hl.Parent = folder
+            local bb = Instance.new("BillboardGui")
+            bb.Name = "ESPInfo"
+            bb.Size = UDim2.fromOffset(220, 46)
+            bb.StudsOffset = Vector3.new(0, 4.2, 0)
+            bb.AlwaysOnTop = true
+            bb.Adornee = model.PrimaryPart or model:FindFirstChild("Head")
+            bb.Parent = folder
+            local lbl = Instance.new("TextLabel")
+            lbl.BackgroundTransparency = 1
+            lbl.Size = UDim2.fromScale(1, 1)
+            lbl.Font = Enum.Font.Code
+            lbl.TextSize = 13
+            lbl.TextStrokeTransparency = 0.15
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.TextYAlignment = Enum.TextYAlignment.Bottom
+            lbl.Parent = bb
+            entry = {hl = hl, bb = bb, lbl = lbl}
+            espCache[model] = entry
+        end
+        local hp = model:GetAttribute("Health") or 20
+        local maxHp = model:GetAttribute("MaxHealth") or 20
+        local abs = model:GetAttribute("Absorption") or 0
+        local kit = model:GetAttribute("Kit") or "Bot"
+        local using = model:GetAttribute("Using")
+        local heldId = ""
+        local offId = ""
+        local rig = visualsRigs and visualsRigs[model]
+        if rig then
+            heldId = (rig.heldStack and rig.heldStack.id) or ""
+            offId = (rig.offStack and rig.offStack.id) or ""
+        end
+        local isShield = (using == "shield")
+        entry.hl.FillColor = isShield and Color3.fromRGB(60, 160, 255) or Color3.fromRGB(255, 65, 65)
+        local lines = {}
+        local nameStr = model:GetAttribute("DisplayName") or model.Name
+        if Cfg.ESPShowKit then
+            nameStr = string.format("%s [%s]", nameStr, tostring(kit))
+        end
+        table.insert(lines, nameStr)
+        if Cfg.ESPShowHP then
+            table.insert(lines, string.format("HP: %.1f/%d (+%.0f)", hp, maxHp, abs))
+        end
+        if Cfg.ESPShowHeld and (heldId ~= "" or offId ~= "") then
+            table.insert(lines, string.format("Main: %s | Off: %s%s", heldId ~= "" and heldId or "none", offId ~= "" and offId or "none", isShield and " [SHIELDING]" or ""))
+        end
+        entry.lbl.Text = table.concat(lines, "\n")
+    end
+    for m in pairs(espCache) do
+        if not activeModels[m] or not m.Parent then
+            clearESPFor(m)
+        end
+    end
+end
+local renderConn = RunService.RenderStepped:Connect(updateESP)
+local PACK_ROOT = "MourierPacks"
+local origImages = {}
+for k, v in pairs(Images) do
+    if type(v) == "string" then
+        origImages[k] = v
+    end
+end
+local origPackOf = Icons.packOf
+local origIconsFill = Icons.fill
+local origBlockTex = {}
+for k, v in pairs(Blocks.Tex) do
+    if type(v) == "string" then
+        origBlockTex[k] = v
+    end
+end
+local origMaterialMaps = {}
+for _, mv in ipairs(MaterialService:GetChildren()) do
+    if mv:IsA("MaterialVariant") then
+        origMaterialMaps[mv] = {
+            colorMap = mv.ColorMap,
+            tex = mv:GetAttribute("Tex"),
+        }
+    end
+end
+local origWsfPackKey = WeaponSkinFX.packKey
+local origWsfPackAsset = WeaponSkinFX.packAsset
+local ItemsAssetsFolder = MC_Shared:WaitForChild("Assets"):WaitForChild("Items")
+local trackedIconSlots = setmetatable({}, { __mode = "k" })
+local activePackAssets = nil
+local activePackName = "Vanilla (Default)"
+local activeRectMap = {}
+local packVersionCounter = 0
+local worldOldToNew = {}
+local mcWorldDescConn = nil
+local cachedHeldModels = {}
+Icons.fill = function(slotFrame, itemData, opts)
+    if slotFrame then
+        trackedIconSlots[slotFrame] = { item = itemData, opts = opts }
+    end
+    return origIconsFill(slotFrame, itemData, opts)
+end
+local function ensureFolder(path)
+    if not makefolder then return end
+    local cur = ""
+    for part in string.gmatch(path, "[^/\\]+") do
+        cur = (cur == "") and part or (cur .. "/" .. part)
+        if isfolder then
+            if not isfolder(cur) then pcall(makefolder, cur) end
+        else
+            pcall(makefolder, cur)
+        end
+    end
+end
+local function inflateRaw(data, startPos, compSize)
+    local endPos = startPos + compSize - 1
+    local pos = startPos
+    local bitBuf, bitCount = 0, 0
+    local function needBits(n)
+        while bitCount < n do
+            local b = (pos <= endPos) and string.byte(data, pos) or 0
+            pos = pos + 1
+            bitBuf = bit32.bor(bitBuf, bit32.lshift(b, bitCount))
+            bitCount = bitCount + 8
+        end
+    end
+    local function readBits(n)
+        if n == 0 then return 0 end
+        needBits(n)
+        local val = bit32.band(bitBuf, bit32.lshift(1, n) - 1)
+        bitBuf = bit32.rshift(bitBuf, n)
+        bitCount = bitCount - n
+        return val
+    end
+    local function alignByte()
+        bitBuf = 0
+        bitCount = 0
+    end
+    local function buildHuffman(lengths, numSyms)
+        local blCount = {}
+        local maxBits = 0
+        for i = 0, numSyms - 1 do
+            local l = lengths[i] or 0
+            if l > 0 then
+                blCount[l] = (blCount[l] or 0) + 1
+                if l > maxBits then maxBits = l end
+            end
+        end
+        local nextCode = {}
+        local code = 0
+        for bits = 1, maxBits do
+            code = bit32.lshift(code + (blCount[bits - 1] or 0), 1)
+            nextCode[bits] = code
+        end
+        local tree = {}
+        for bits = 1, maxBits do tree[bits] = {} end
+        for sym = 0, numSyms - 1 do
+            local l = lengths[sym] or 0
+            if l > 0 then
+                local c = nextCode[l]
+                nextCode[l] = c + 1
+                tree[l][c] = sym
+            end
+        end
+        return tree, maxBits
+    end
+    local function decodeSym(tree, maxBits)
+        local val = 0
+        for len = 1, maxBits do
+            val = bit32.bor(bit32.lshift(val, 1), readBits(1))
+            local sym = tree[len] and tree[len][val]
+            if sym ~= nil then return sym end
+        end
+        error("Invalid Huffman code in DEFLATE stream")
+    end
+    local fixedLitLen = {}
+    for i = 0, 143 do fixedLitLen[i] = 8 end
+    for i = 144, 255 do fixedLitLen[i] = 9 end
+    for i = 256, 279 do fixedLitLen[i] = 7 end
+    for i = 280, 287 do fixedLitLen[i] = 8 end
+    local fixedLitTree, fixedLitMax = buildHuffman(fixedLitLen, 288)
+    local fixedDistLen = {}
+    for i = 0, 31 do fixedDistLen[i] = 5 end
+    local fixedDistTree, fixedDistMax = buildHuffman(fixedDistLen, 32)
+    local LEN_BASE = {3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}
+    local LEN_EXTRA = {0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0}
+    local DIST_BASE = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}
+    local DIST_EXTRA = {0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13}
+    local CL_ORDER = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15}
+    local out = {}
+    local outLen = 0
+    local bfinal = 0
+    repeat
+        bfinal = readBits(1)
+        local btype = readBits(2)
+        if btype == 0 then
+            alignByte()
+            local len = string.byte(data, pos) + string.byte(data, pos + 1) * 256
+            pos = pos + 4
+            for i = 0, len - 1 do
+                outLen = outLen + 1
+                out[outLen] = string.byte(data, pos + i)
+            end
+            pos = pos + len
+        elseif btype == 1 or btype == 2 then
+            local litTree, litMax, distTree, distMax
+            if btype == 1 then
+                litTree, litMax = fixedLitTree, fixedLitMax
+                distTree, distMax = fixedDistTree, fixedDistMax
+            else
+                local hlit = readBits(5) + 257
+                local hdist = readBits(5) + 1
+                local hclen = readBits(4) + 4
+                local clLens = {}
+                for i = 1, hclen do
+                    clLens[CL_ORDER[i]] = readBits(3)
+                end
+                local clTree, clMax = buildHuffman(clLens, 19)
+                local allLens = {}
+                local idx = 0
+                local total = hlit + hdist
+                while idx < total do
+                    local sym = decodeSym(clTree, clMax)
+                    if sym < 16 then
+                        allLens[idx] = sym
+                        idx = idx + 1
+                    elseif sym == 16 then
+                        local rep = 3 + readBits(2)
+                        local prev = allLens[idx - 1] or 0
+                        for _ = 1, rep do allLens[idx] = prev; idx = idx + 1 end
+                    elseif sym == 17 then
+                        local rep = 3 + readBits(3)
+                        for _ = 1, rep do allLens[idx] = 0; idx = idx + 1 end
+                    else
+                        local rep = 11 + readBits(7)
+                        for _ = 1, rep do allLens[idx] = 0; idx = idx + 1 end
+                    end
+                end
+                local litLens, distLens = {}, {}
+                for i = 0, hlit - 1 do litLens[i] = allLens[i] end
+                for i = 0, hdist - 1 do distLens[i] = allLens[hlit + i] end
+                litTree, litMax = buildHuffman(litLens, hlit)
+                distTree, distMax = buildHuffman(distLens, hdist)
+            end
+            while true do
+                local sym = decodeSym(litTree, litMax)
+                if sym < 256 then
+                    outLen = outLen + 1
+                    out[outLen] = sym
+                elseif sym == 256 then
+                    break
+                else
+                    local li = sym - 256
+                    local length = LEN_BASE[li] + readBits(LEN_EXTRA[li])
+                    local di = decodeSym(distTree, distMax) + 1
+                    local dist = DIST_BASE[di] + readBits(DIST_EXTRA[di])
+                    for _ = 1, length do
+                        outLen = outLen + 1
+                        out[outLen] = out[outLen - dist]
+                    end
+                end
+            end
+        else
+            error("Unsupported DEFLATE block type: " .. tostring(btype))
+        end
+    until bfinal == 1
+    local parts = {}
+    for i = 1, outLen, 4096 do
+        local j = math.min(i + 4095, outLen)
+        parts[#parts + 1] = string.char(table.unpack(out, i, j))
+    end
+    return table.concat(parts)
+end
+local function readU16(s, i)
+    local a, b = string.byte(s, i, i + 1)
+    return a + b * 256
+end
+local function readU32(s, i)
+    local a, b, c, d = string.byte(s, i, i + 3)
+    return a + b * 256 + c * 65536 + d * 16777216
+end
+local function extractZipTextures(zipBytes, packFolder)
+    local n = #zipBytes
+    local eocdPos = nil
+    for i = n - 21, math.max(1, n - 65557), -1 do
+        if string.byte(zipBytes, i) == 0x50 and string.byte(zipBytes, i + 1) == 0x4B
+           and string.byte(zipBytes, i + 2) == 0x05 and string.byte(zipBytes, i + 3) == 0x06 then
+            eocdPos = i
+            break
+        end
+    end
+    if not eocdPos then error("Invalid ZIP archive (no EOCD)") end
+    local cdOffset = readU32(zipBytes, eocdPos + 16) + 1
+    local totalEntries = readU16(zipBytes, eocdPos + 10)
+    local baseDir = PACK_ROOT .. "/" .. packFolder
+    ensureFolder(baseDir)
+    local extracted = 0
+    local p = cdOffset
+    for _ = 1, totalEntries do
+        if readU32(zipBytes, p) ~= 0x02014B50 then break end
+        local method = readU16(zipBytes, p + 10)
+        local compSize = readU32(zipBytes, p + 20)
+        local nameLen = readU16(zipBytes, p + 28)
+        local extraLen = readU16(zipBytes, p + 30)
+        local commentLen = readU16(zipBytes, p + 32)
+        local localHeaderOff = readU32(zipBytes, p + 42) + 1
+        local fileName = string.sub(zipBytes, p + 46, p + 45 + nameLen)
+        p = p + 46 + nameLen + extraLen + commentLen
+        local subTex = string.match(fileName, "^assets/minecraft/textures/(.+%.png)$")
+        if subTex and (
+            string.sub(subTex, 1, 5) == "item/" or
+            string.sub(subTex, 1, 16) == "gui/sprites/hud/" or
+            subTex == "gui/icons.png" or
+            subTex == "gui/widgets.png" or
+            string.sub(subTex, 1, 9) == "particle/" or
+            string.sub(subTex, 1, 11) == "mob_effect/" or
+            string.sub(subTex, 1, 6) == "block/"
+        ) then
+            local lhNameLen = readU16(zipBytes, localHeaderOff + 26)
+            local lhExtraLen = readU16(zipBytes, localHeaderOff + 28)
+            local dataStart = localHeaderOff + 30 + lhNameLen + lhExtraLen
+            local rawPng = nil
+            if method == 0 then
+                rawPng = string.sub(zipBytes, dataStart, dataStart + compSize - 1)
+            elseif method == 8 then
+                local okInf, resInf = pcall(inflateRaw, zipBytes, dataStart, compSize)
+                if okInf then rawPng = resInf end
+            end
+            if rawPng and #rawPng > 8 then
+                local outPath = baseDir .. "/" .. subTex
+                local parentDir = string.match(outPath, "^(.+)/[^/]+$")
+                if parentDir then ensureFolder(parentDir) end
+                writefile(outPath, rawPng)
+                extracted = extracted + 1
+                if extracted % 12 == 0 then task.wait() end
+            end
+        end
+    end
+    return extracted
+end
+local function refreshPlayerGuiTextures(oldToNewMap, oldToSliceMap)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return end
+    for _, guiName in ipairs({"MCHud", "MCInventory", "MCHotbar", "MCKits"}) do
+        local g = pg:FindFirstChild(guiName)
+        if g then
+            for _, d in ipairs(g:GetDescendants()) do
+                if d:IsA("ImageLabel") or d:IsA("ImageButton") then
+                    local slice = oldToSliceMap and oldToSliceMap[d.Image]
+                    local nextImg = (slice and slice.img) or oldToNewMap[d.Image]
+                    if nextImg then
+                        d.Image = nextImg
+                        if slice then
+                            d.ImageRectOffset = slice.offset
+                            d.ImageRectSize = slice.size
+                        else
+                            d.ImageRectOffset = Vector2.new(0, 0)
+                            d.ImageRectSize = Vector2.new(0, 0)
+                        end
+                    end
+                elseif d.Name == "Icon" and d:GetAttribute("Picture") ~= nil then
+                    d:SetAttribute("Picture", nil)
+                end
+            end
+        end
+    end
+end
+local function refreshWorldTextures(oldToNewMap)
+    local mcw = Workspace:FindFirstChild("MCWorld")
+    if not mcw then return 0 end
+    local count = 0
+    local idx = 0
+    for _, d in ipairs(mcw:GetDescendants()) do
+        if d:IsA("Texture") or d:IsA("Decal") then
+            local nextTex = oldToNewMap[d.Texture]
+            if nextTex then
+                d.Texture = nextTex
+                count = count + 1
+            end
+        end
+        idx = idx + 1
+        if idx % 1500 == 0 then task.wait() end
+    end
+    return count
+end
+local function triggerHandsChanged()
+    task.defer(function()
+        if Hands and Hands.onChanged then
+            for _, cb in pairs(Hands.onChanged) do
+                task.spawn(cb)
+            end
+        end
+    end)
+end
+local function redrawAllSlots()
+    for slotFrame, data in pairs(trackedIconSlots) do
+        if slotFrame and slotFrame.Parent then
+            pcall(origIconsFill, slotFrame, data.item, data.opts)
+        end
+    end
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    local hud = pg and pg:FindFirstChild("MCHud")
+    local bottom = hud and hud:FindFirstChild("Bottom")
+    if bottom then
+        local inv = Hands and Hands.inv
+        for i = 1, 9 do
+            local slotFrame = bottom:FindFirstChild("Slot" .. i)
+            if slotFrame and not trackedIconSlots[slotFrame] then
+                local realItem = inv and inv.hotbar and inv.hotbar[i]
+                if realItem then
+                    local icon = slotFrame:FindFirstChild("Icon")
+                    if icon then icon:SetAttribute("Picture", nil) end
+                    pcall(origIconsFill, slotFrame, realItem, {})
+                end
+            end
+        end
+        local offFrame = bottom:FindFirstChild("OffhandSlot") or bottom:FindFirstChild("Offhand")
+        if offFrame and not trackedIconSlots[offFrame] and offFrame:FindFirstChild("Icon") then
+            local realOff = inv and inv.offhand
+            if realOff then
+                offFrame.Icon:SetAttribute("Picture", nil)
+                pcall(origIconsFill, offFrame, realOff, {})
+            end
+        end
+        for _, slotFrame in ipairs(bottom:GetChildren()) do
+            if not trackedIconSlots[slotFrame] then
+                local icon = slotFrame:FindFirstChild("Icon")
+                local pic = icon and icon:GetAttribute("Picture")
+                if type(pic) == "string" then
+                    local itemId, _, _, _, ench = string.match(pic, "^([^|]*)|([^|]*)|([^|]*)|([^|]*)|([^|]*)")
+                    if itemId and itemId ~= "" then
+                        local countLbl = icon:FindFirstChild("Count")
+                        local cnt = countLbl and tonumber(countLbl.Text) or 1
+                        local fakeItem = { id = itemId, count = cnt }
+                        if ench == "true" then
+                            fakeItem.enchants = { { id = "sharpness", level = 1 } }
+                        end
+                        icon:SetAttribute("Picture", nil)
+                        pcall(origIconsFill, slotFrame, fakeItem, {})
+                    end
+                end
+            end
+        end
+    end
+end
+local function resetToVanillaPack()
+    local oldToNew = {}
+    for k, origVal in pairs(origImages) do
+        if Images[k] and Images[k] ~= origVal then
+            oldToNew[Images[k]] = origVal
+        end
+        Images[k] = origVal
+    end
+    local worldRestore = {}
+    for k, origVal in pairs(origBlockTex) do
+        if Blocks.Tex[k] and Blocks.Tex[k] ~= origVal then
+            worldRestore[Blocks.Tex[k]] = origVal
+        end
+        Blocks.Tex[k] = origVal
+    end
+    for mv, origMv in pairs(origMaterialMaps) do
+        if mv and mv.Parent then
+            if mv.ColorMap ~= origMv.colorMap then
+                worldRestore[mv.ColorMap] = origMv.colorMap
+            end
+            mv.ColorMap = origMv.colorMap
+            if origMv.tex ~= nil then
+                mv:SetAttribute("Tex", origMv.tex)
+            end
+        end
+    end
+    if mcWorldDescConn then
+        mcWorldDescConn:Disconnect()
+        mcWorldDescConn = nil
+    end
+    worldOldToNew = {}
+    cachedHeldModels = {}
+    Icons.packOf = origPackOf
+    WeaponSkinFX.packKey = origWsfPackKey
+    WeaponSkinFX.packAsset = origWsfPackAsset
+    packVersionCounter = packVersionCounter + 1
+    activePackAssets = nil
+    activePackName = "Vanilla (Default)"
+    activeRectMap = {}
+    refreshPlayerGuiTextures(oldToNew, nil)
+    refreshWorldTextures(worldRestore)
+    redrawAllSlots()
+    triggerHandsChanged()
+end
+local function applyPackFromFolder(packFolder, displayTitle)
+    if not getcustomasset then
+        error("Executor missing getcustomasset()")
+    end
+    local baseDir = PACK_ROOT .. "/" .. packFolder
+    local function tryAsset(relPath)
+        local full = baseDir .. "/" .. relPath
+        if isfile and isfile(full) then
+            local ok, asset = pcall(getcustomasset, full)
+            if ok and asset then return asset end
+        end
+        return nil
+    end
+    local itemMap = {}
+    if listfiles and isfolder and isfolder(baseDir .. "/item") then
+        for _, f in ipairs(listfiles(baseDir .. "/item")) do
+            local fname = string.match(f, "([^/\\]+)%.png$")
+            if fname then
+                local ok, asset = pcall(getcustomasset, f)
+                if ok and asset then
+                    itemMap[fname] = asset
+                end
+            end
+        end
+    end
+    local hudMappings = {
+        crosshair = {"gui/sprites/hud/crosshair.png"},
+        hotbar = {"gui/sprites/hud/hotbar.png"},
+        hotbar_select = {"gui/sprites/hud/hotbar_selection.png"},
+        hotbar_offhand = {"gui/sprites/hud/hotbar_offhand_left.png", "gui/sprites/hud/hotbar_offhand_right.png"},
+        heart_full = {"gui/sprites/hud/heart/full.png"},
+        heart_half = {"gui/sprites/hud/heart/half.png"},
+        heart_empty = {"gui/sprites/hud/heart/container.png"},
+        heart_full_blink = {"gui/sprites/hud/heart/full_blinking.png"},
+        heart_half_blink = {"gui/sprites/hud/heart/half_blinking.png"},
+        heart_container_blink = {"gui/sprites/hud/heart/container_blinking.png"},
+        heart_gold = {"gui/sprites/hud/heart/absorbing_full.png"},
+        heart_gold_half = {"gui/sprites/hud/heart/absorbing_half.png"},
+        heart_wither_full = {"gui/sprites/hud/heart/withered_full.png"},
+        heart_wither_half = {"gui/sprites/hud/heart/withered_half.png"},
+        food_full = {"gui/sprites/hud/food_full.png"},
+        food_half = {"gui/sprites/hud/food_half.png"},
+        food_empty = {"gui/sprites/hud/food_empty.png"},
+        armor_full = {"gui/sprites/hud/armor_full.png"},
+        armor_half = {"gui/sprites/hud/armor_half.png"},
+        armor_empty = {"gui/sprites/hud/armor_empty.png"},
+        xp_background = {"gui/sprites/hud/experience_bar_background.png"},
+        xp_progress = {"gui/sprites/hud/experience_bar_progress.png"},
+        air = {"gui/sprites/hud/air.png"},
+        air_empty = {"gui/sprites/hud/air_empty.png"},
+        air_bursting = {"gui/sprites/hud/air_bursting.png"},
+        p_crit = {"particle/critical_hit.png"},
+        p_magic = {"particle/enchanted_hit.png"},
+        p_heart = {"particle/heart.png"},
+        p_flame = {"particle/flame.png"},
+        p_soul_flame = {"particle/soul_flame.png"},
+        pf_explosion = {"particle/explosion_0.png"},
+        pf_gust = {"particle/gust_0.png"},
+        p_sweep = {"particle/sweep_0.png"},
+        pf_sweep = {"particle/sweep_0.png"},
+        p_glint = {"particle/glint.png"},
+        p_flash = {"particle/flash.png"},
+        p_bubble = {"particle/bubble.png"},
+        blk_magma = {"block/magma.png"},
+        blk_sculk = {"block/sculk.png"},
+        eff_speed = {"mob_effect/speed.png"},
+        eff_strength = {"mob_effect/strength.png"},
+        eff_resistance = {"mob_effect/resistance.png"},
+        eff_regeneration = {"mob_effect/regeneration.png"},
+        eff_fire_resistance = {"mob_effect/fire_resistance.png"},
+        eff_absorption = {"mob_effect/absorption.png"},
+        eff_jump_boost = {"mob_effect/jump_boost.png"},
+        eff_slow_falling = {"mob_effect/slow_falling.png"},
+        eff_slowness = {"mob_effect/slowness.png"},
+        eff_weakness = {"mob_effect/weakness.png"},
+        eff_wither = {"mob_effect/wither.png"},
+        eff_invisibility = {"mob_effect/invisibility.png"},
+        eff_levitation = {"mob_effect/levitation.png"},
+    }
+    local oldToNew = {}
+    local swappedCount = 0
+    local rectMap = {}
+    for k, origVal in pairs(origImages) do
+        if Images[k] ~= origVal then
+            oldToNew[Images[k]] = origVal
+            Images[k] = origVal
+        end
+    end
+    for imgKey, candidates in pairs(hudMappings) do
+        for _, relPath in ipairs(candidates) do
+            local asset = tryAsset(relPath)
+            if asset then
+                local prev = Images[imgKey]
+                if prev then oldToNew[prev] = asset end
+                if origImages[imgKey] then oldToNew[origImages[imgKey]] = asset end
+                Images[imgKey] = asset
+                swappedCount = swappedCount + 1
+                break
+            end
+        end
+    end
+    local iconsSheet = tryAsset("gui/icons.png")
+    if iconsSheet then
+        local iconSlices = {
+            crosshair = { offset = Vector2.new(0, 0), size = Vector2.new(15, 15) },
+            heart_empty = { offset = Vector2.new(16, 0), size = Vector2.new(9, 9) },
+            heart_full = { offset = Vector2.new(52, 0), size = Vector2.new(9, 9) },
+            heart_half = { offset = Vector2.new(61, 0), size = Vector2.new(9, 9) },
+            heart_gold = { offset = Vector2.new(160, 0), size = Vector2.new(9, 9) },
+            heart_gold_half = { offset = Vector2.new(169, 0), size = Vector2.new(9, 9) },
+            armor_empty = { offset = Vector2.new(16, 9), size = Vector2.new(9, 9) },
+            armor_full = { offset = Vector2.new(34, 9), size = Vector2.new(9, 9) },
+            armor_half = { offset = Vector2.new(25, 9), size = Vector2.new(9, 9) },
+            food_empty = { offset = Vector2.new(16, 27), size = Vector2.new(9, 9) },
+            food_full = { offset = Vector2.new(52, 27), size = Vector2.new(9, 9) },
+            food_half = { offset = Vector2.new(61, 27), size = Vector2.new(9, 9) },
+            xp_background = { offset = Vector2.new(0, 64), size = Vector2.new(182, 5) },
+            xp_progress = { offset = Vector2.new(0, 69), size = Vector2.new(182, 5) },
+        }
+        for imgKey, slice in pairs(iconSlices) do
+            if Images[imgKey] == origImages[imgKey] then
+                local prev = Images[imgKey]
+                local entry = { img = iconsSheet, offset = slice.offset, size = slice.size }
+                if prev then
+                    oldToNew[prev] = iconsSheet
+                    rectMap[prev] = entry
+                end
+                if origImages[imgKey] then
+                    oldToNew[origImages[imgKey]] = iconsSheet
+                    rectMap[origImages[imgKey]] = entry
+                end
+                Images[imgKey] = iconsSheet
+                swappedCount = swappedCount + 1
+            end
+        end
+    end
+    local widgetsSheet = tryAsset("gui/widgets.png")
+    if widgetsSheet then
+        local widgetSlices = {
+            hotbar = { offset = Vector2.new(0, 0), size = Vector2.new(182, 22) },
+            hotbar_select = { offset = Vector2.new(0, 22), size = Vector2.new(24, 24) },
+            hotbar_offhand = { offset = Vector2.new(24, 22), size = Vector2.new(29, 24) },
+        }
+        for imgKey, slice in pairs(widgetSlices) do
+            if Images[imgKey] == origImages[imgKey] then
+                local prev = Images[imgKey]
+                local entry = { img = widgetsSheet, offset = slice.offset, size = slice.size }
+                if prev then
+                    oldToNew[prev] = widgetsSheet
+                    rectMap[prev] = entry
+                end
+                if origImages[imgKey] then
+                    oldToNew[origImages[imgKey]] = widgetsSheet
+                    rectMap[origImages[imgKey]] = entry
+                end
+                Images[imgKey] = widgetsSheet
+                swappedCount = swappedCount + 1
+            end
+        end
+    end
+    local itemAliases = {
+        crossbow = {"crossbow_standby", "crossbow"},
+        crossbow_arrow = {"crossbow_arrow", "crossbow_standby"},
+        bow = {"bow_standby", "bow"},
+        fishing_rod = {"fishing_rod_uncast", "fishing_rod"},
+        enchanted_golden_apple = {"enchanted_golden_apple", "golden_apple"},
+        potion = {"potion", "potion_bottle_drinkable"},
+        splash_potion = {"splash_potion", "potion_bottle_splash"},
+        lingering_potion = {"lingering_potion", "potion_bottle_lingering"},
+    }
+    local itemCount = 0
+    for _ in pairs(itemMap) do itemCount = itemCount + 1 end
+    local blockMap = {}
+    if listfiles and isfolder and isfolder(baseDir .. "/block") then
+        for _, f in ipairs(listfiles(baseDir .. "/block")) do
+            local fname = string.match(f, "([^/\\]+)%.png$")
+            if fname then
+                local ok, asset = pcall(getcustomasset, f)
+                if ok and asset then
+                    blockMap[fname] = asset
+                end
+            end
+        end
+    end
+    local blockAliases = {
+        grass_side = {"grass_block_side", "grass_side"},
+        grass_top = {"grass_block_top", "grass_top"},
+        water = {"water_still", "water"},
+        quartz_side = {"quartz_block_side", "quartz_side"},
+        quartz_top = {"quartz_block_top", "quartz_top"},
+        oak_log_h = {"oak_log"},
+        spruce_log_h = {"spruce_log"},
+        dark_oak_log_h = {"dark_oak_log"},
+        basalt_side_h = {"basalt_side"},
+        grass = {"grass_block_side", "grass_side"},
+        planks = {"oak_planks"},
+        log = {"oak_log"},
+        quartz = {"quartz_block_side"},
+        iron = {"iron_block"},
+        acacia_wood = {"acacia_log"},
+        crimson_hyphae = {"crimson_stem"},
+        mangrove = {"mangrove_planks"},
+        tuff_brick = {"tuff_bricks"},
+        mud_brick = {"mud_bricks"},
+        crafting_table = {"crafting_table_side", "crafting_table_front"},
+        furnace = {"furnace_front", "furnace_side"},
+        blast_furnace = {"blast_furnace_front", "blast_furnace_side"},
+        smoker = {"smoker_front"},
+        observer = {"observer_front", "observer_side"},
+        piston = {"piston_side"},
+        hopper = {"hopper_outside"},
+        crafter = {"crafter_side", "crafter_top"},
+        purple_shulker_box = {"purple_shulker_box", "shulker_box"},
+        red_shulker_box = {"red_shulker_box", "shulker_box"},
+        stripped_dark_oak_wood = {"stripped_dark_oak_log"},
+        nether_wart = {"nether_wart_block"},
+    }
+    local function findBlockAsset(name)
+        if blockMap[name] then return blockMap[name] end
+        local alList = blockAliases[name]
+        if alList then
+            for _, al in ipairs(alList) do
+                if blockMap[al] then return blockMap[al] end
+            end
+        end
+        for _, suf in ipairs({"_side", "_front", "_top", "_block", "_planks", "_bricks", "s"}) do
+            if blockMap[name .. suf] then return blockMap[name .. suf] end
+        end
+        return nil
+    end
+    local function pascalToSnake(s)
+        local sn = string.gsub(s, "([a-z0-9])([A-Z])", "%1_%2")
+        return string.lower(sn)
+    end
+    local wOldToNew = {}
+    local blockSwapped = 0
+    for k, origVal in pairs(origBlockTex) do
+        if Blocks.Tex[k] ~= origVal then
+            wOldToNew[Blocks.Tex[k]] = origVal
+            Blocks.Tex[k] = origVal
+        end
+    end
+    for mv, origMv in pairs(origMaterialMaps) do
+        if mv and mv.Parent then
+            if mv.ColorMap ~= origMv.colorMap then
+                wOldToNew[mv.ColorMap] = origMv.colorMap
+                mv.ColorMap = origMv.colorMap
+            end
+            if origMv.tex ~= nil then
+                mv:SetAttribute("Tex", origMv.tex)
+            end
+        end
+    end
+    for k, origVal in pairs(origBlockTex) do
+        local asset = findBlockAsset(k)
+        if asset then
+            local prev = Blocks.Tex[k]
+            if prev then wOldToNew[prev] = asset end
+            wOldToNew[origVal] = asset
+            Blocks.Tex[k] = asset
+            blockSwapped = blockSwapped + 1
+        end
+    end
+    for mv, origMv in pairs(origMaterialMaps) do
+        if mv and mv.Parent then
+            local rawName = mv.Name
+            local stripped = string.match(rawName, "^MC_MC(.+)$") or string.match(rawName, "^MC_(.+)$") or rawName
+            local snake = pascalToSnake(stripped)
+            local asset = findBlockAsset(snake)
+            if not asset and origMv.colorMap then
+                asset = wOldToNew[origMv.colorMap]
+            end
+            if asset then
+                if mv.ColorMap ~= "" then wOldToNew[mv.ColorMap] = asset end
+                if origMv.colorMap ~= "" then wOldToNew[origMv.colorMap] = asset end
+                mv.ColorMap = asset
+                if origMv.tex ~= nil then mv:SetAttribute("Tex", asset) end
+                blockSwapped = blockSwapped + 1
+            end
+        end
+    end
+    if mcWorldDescConn then
+        mcWorldDescConn:Disconnect()
+        mcWorldDescConn = nil
+    end
+    worldOldToNew = wOldToNew
+    refreshWorldTextures(wOldToNew)
+    local mcw = Workspace:FindFirstChild("MCWorld")
+    if mcw and next(wOldToNew) ~= nil then
+        mcWorldDescConn = mcw.DescendantAdded:Connect(function(d)
+            if (d:IsA("Texture") or d:IsA("Decal")) and worldOldToNew[d.Texture] then
+                d.Texture = worldOldToNew[d.Texture]
+            end
+        end)
+    end
+    local function resolveItemTex(assetName)
+        if itemMap[assetName] then return itemMap[assetName], assetName end
+        local aliases = itemAliases[assetName]
+        if aliases then
+            for _, al in ipairs(aliases) do
+                if itemMap[al] then return itemMap[al], al end
+            end
+        end
+        if assetName == "mace" and itemMap["mace_in_hand"] then
+            return itemMap["mace_in_hand"], "mace_in_hand"
+        end
+        return nil, nil
+    end
+    Icons.packOf = function(assetName)
+        local tex, usedName = resolveItemTex(assetName)
+        if tex then
+            return "mourier_" .. packFolder .. "_" .. usedName, tex
+        end
+        if origPackOf then
+            return origPackOf(assetName)
+        end
+        return nil, nil
+    end
+    cachedHeldModels = {}
+    packVersionCounter = packVersionCounter + 1
+    local curPackTag = "MOURIER_" .. packVersionCounter
+    WeaponSkinFX.packKey = function()
+        return curPackTag
+    end
+    WeaponSkinFX.packAsset = function(assetName)
+        local tex = resolveItemTex(assetName)
+        if not tex then
+            return origWsfPackAsset and origWsfPackAsset(assetName) or nil
+        end
+        if cachedHeldModels[assetName] ~= nil then
+            return cachedHeldModels[assetName] or nil
+        end
+        local base = ItemsAssetsFolder:FindFirstChild(assetName)
+        if not base then
+            cachedHeldModels[assetName] = false
+            return nil
+        end
+        local clone = base:Clone()
+        local pp = (clone:IsA("Model") and (clone.PrimaryPart or clone:FindFirstChild("Handle"))) or clone
+        if not pp or not pp:IsA("BasePart") then
+            cachedHeldModels[assetName] = false
+            return nil
+        end
+        local bbCf, sz = clone:GetBoundingBox()
+        for _, d in ipairs(clone:GetDescendants()) do
+            if d:IsA("BasePart") then
+                d.Transparency = 1
+            elseif d:IsA("Decal") or d:IsA("Texture") or d:IsA("SurfaceAppearance") then
+                d:Destroy()
+            end
+        end
+        if clone:IsA("BasePart") then clone.Transparency = 1 end
+        local sprite = Instance.new("Part")
+        sprite.Name = "PackSprite"
+        sprite.Size = Vector3.new(sz.X, sz.Y, 0.03)
+        sprite.CFrame = bbCf
+        sprite.Transparency = 1
+        sprite.Anchored = false
+        sprite.CanCollide = false
+        sprite.CanQuery = false
+        sprite.CanTouch = false
+        sprite.Massless = true
+        sprite.CastShadow = false
+        sprite.Material = Enum.Material.SmoothPlastic
+        for _, face in ipairs({Enum.NormalId.Front, Enum.NormalId.Back}) do
+            local dec = Instance.new("Decal")
+            dec.Face = face
+            dec.Texture = tex
+            dec.Parent = sprite
+        end
+        local weld = Instance.new("Weld")
+        weld.Part0 = pp
+        weld.Part1 = sprite
+        weld.C0 = pp.CFrame:ToObjectSpace(bbCf)
+        weld.Parent = sprite
+        sprite.Parent = clone
+        cachedHeldModels[assetName] = clone
+        return clone
+    end
+    activePackAssets = itemMap
+    activePackName = displayTitle or packFolder
+    activeRectMap = rectMap
+    savedPackFolder = packFolder
+    savedPackName = activePackName
+    scheduleSave()
+    refreshPlayerGuiTextures(oldToNew, rectMap)
+    redrawAllSlots()
+    triggerHandsChanged()
+    return itemCount, swappedCount + blockSwapped
+end
+local function fetchAndApplyModrinth(slugOrUrl)
+    local slug = slugOrUrl
+    local urlMatch = string.match(slugOrUrl, "modrinth%.com/resourcepack/([^/%?#]+)")
+    if urlMatch then slug = urlMatch end
+    slug = string.gsub(slug, "^%s*(.-)%s*$", "%1")
+    if slug == "" then error("Empty Modrinth slug/URL") end
+    local folderName = string.gsub(slug, "[^%w%-_]", "_")
+    local packDir = PACK_ROOT .. "/" .. folderName
+    if isfolder and isfolder(packDir) and listfiles and #listfiles(packDir) > 0 then
+        local hasFiles = false
+        for _, sub in ipairs(listfiles(packDir)) do
+            if isfile(sub) or (isfolder(sub) and #listfiles(sub) > 0) then
+                hasFiles = true
+                break
+            end
+        end
+        if hasFiles then
+            local ic, hc = applyPackFromFolder(folderName, slug)
+            return ic, hc, true
+        end
+    end
+    local apiUrl = "https://api.modrinth.com/v2/project/" .. HttpService:UrlEncode(slug) .. "/version"
+    local verJson = game:HttpGet(apiUrl)
+    local versions = HttpService:JSONDecode(verJson)
+    if type(versions) ~= "table" or #versions == 0 then
+        error("No versions found on Modrinth for: " .. slug)
+    end
+    local dlUrl = nil
+    for _, ver in ipairs(versions) do
+        for _, f in ipairs(ver.files or {}) do
+            if string.match(f.filename or "", "%.zip$") then
+                dlUrl = f.url
+                break
+            end
+        end
+        if dlUrl then break end
+    end
+    if not dlUrl then error("No .zip resource pack file found for: " .. slug) end
+    local zipBytes = game:HttpGet(dlUrl)
+    local extracted = extractZipTextures(zipBytes, folderName)
+    if extracted == 0 then
+        error("Downloaded ZIP contained 0 recognized Minecraft textures")
+    end
+    local ic, hc = applyPackFromFolder(folderName, slug)
+    return ic, hc, false
+end
+local Lite = (function()
+    local UIS = game:GetService("UserInputService")
+    local CoreGui = game:GetService("CoreGui")
+    local PlayersService = game:GetService("Players")
+
+    local Lib = { Options = {} }
+    local conns = {}
+    local keybinds = {}
+    local listening = nil
+    local drag = nil
+    local gui = nil
+    local frame = nil
+    local toastHolder = nil
+    local toastCount = 0
+
+    local C = {
+        bg = Color3.fromRGB(20, 18, 30),
+        side = Color3.fromRGB(26, 23, 40),
+        bar = Color3.fromRGB(32, 28, 50),
+        row = Color3.fromRGB(36, 32, 54),
+        action = Color3.fromRGB(62, 46, 108),
+        accent = Color3.fromRGB(150, 100, 235),
+        text = Color3.fromRGB(238, 236, 248),
+        sub = Color3.fromRGB(158, 152, 184),
+        off = Color3.fromRGB(62, 58, 86),
+        white = Color3.new(1, 1, 1),
+    }
+    local AUTO_Y = Enum.AutomaticSize.Y
+    local LEFT = Enum.TextXAlignment.Left
+
+    local function new(class, props, parent)
+        local inst = Instance.new(class)
+        for k, v in pairs(props) do
+            inst[k] = v
+        end
+        inst.Parent = parent
+        return inst
+    end
+
+    local function corner(inst, r)
+        new("UICorner", { CornerRadius = UDim.new(0, r) }, inst)
+        return inst
+    end
+
+    local function pad(inst, l, t, r, b)
+        new("UIPadding", {
+            PaddingLeft = UDim.new(0, l), PaddingTop = UDim.new(0, t),
+            PaddingRight = UDim.new(0, r), PaddingBottom = UDim.new(0, b),
+        }, inst)
+    end
+
+    local function vlist(parent, gap)
+        return new("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, gap) }, parent)
+    end
+
+    local function isPointer(input)
+        return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
+    end
+
+    local function newOption(id, kind, value)
+        local opt = { Id = id, Kind = kind, Value = value, _changed = {} }
+        function opt:OnChanged(fn)
+            table.insert(self._changed, fn)
+        end
+        function opt:_fire(v)
+            for _, fn in ipairs(self._changed) do
+                pcall(fn, v)
+            end
+        end
+        if id then
+            Lib.Options[id] = opt
+        end
+        return opt
+    end
+
+    local function makeRow(page, order, color)
+        local row = corner(new("Frame", {
+            Size = UDim2.new(1, 0, 0, 0), AutomaticSize = AUTO_Y,
+            BackgroundColor3 = color or C.row, BorderSizePixel = 0, LayoutOrder = order,
+        }, page), 6)
+        pad(row, 10, 8, 10, 8)
+        return row
+    end
+
+    local function textBlock(row, title, desc, rightInset)
+        local holder = new("Frame", {
+            Size = UDim2.new(1, -(rightInset or 0), 0, 0), AutomaticSize = AUTO_Y,
+            BackgroundTransparency = 1, LayoutOrder = 1,
+        }, row)
+        vlist(holder, 2)
+        local t = new("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 0), AutomaticSize = AUTO_Y, BackgroundTransparency = 1,
+            Text = title or "", TextColor3 = C.text, Font = Enum.Font.GothamMedium, TextSize = 13,
+            TextWrapped = true, TextXAlignment = LEFT, LayoutOrder = 1,
+        }, holder)
+        local d = nil
+        if desc ~= nil and desc ~= "" then
+            d = new("TextLabel", {
+                Size = UDim2.new(1, 0, 0, 0), AutomaticSize = AUTO_Y, BackgroundTransparency = 1,
+                Text = desc, TextColor3 = C.sub, Font = Enum.Font.Gotham, TextSize = 11,
+                TextWrapped = true, TextXAlignment = LEFT, LayoutOrder = 2,
+            }, holder)
+        end
+        return t, d
+    end
+
+    -- TAB ---------------------------------------------------------------
+    local Tab = {}
+    Tab.__index = Tab
+
+    function Tab:AddToggle(id, cfg)
+        local opt = newOption(id, "Toggle", cfg.Default and true or false)
+        local cb = cfg.Callback
+        function opt:SetValue(v)
+            self.Value = v and true or false
+            if self._render then self._render() end
+            if cb then pcall(cb, self.Value) end
+            self:_fire(self.Value)
+        end
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order)
+            textBlock(row, cfg.Title, cfg.Description, 52)
+            local sw = corner(new("Frame", {
+                AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.fromOffset(40, 20), BackgroundColor3 = C.off, BorderSizePixel = 0,
+            }, row), 10)
+            local knob = corner(new("Frame", {
+                Size = UDim2.fromOffset(16, 16), Position = UDim2.fromOffset(2, 2),
+                BackgroundColor3 = C.white, BorderSizePixel = 0,
+            }, sw), 8)
+            local hit = new("TextButton", {
+                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 3,
+            }, row)
+            opt._render = function()
+                sw.BackgroundColor3 = opt.Value and C.accent or C.off
+                knob.Position = opt.Value and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2)
+            end
+            opt._render()
+            hit.MouseButton1Click:Connect(function()
+                opt:SetValue(not opt.Value)
+            end)
+        end)
+        if cb then pcall(cb, opt.Value) end
+        return opt
+    end
+
+    function Tab:AddSlider(id, cfg)
+        local min, max = cfg.Min, cfg.Max
+        local rnd = cfg.Rounding or 0
+        local mult = 10 ^ rnd
+        local cb = cfg.Callback
+        local opt = newOption(id, "Slider", math.clamp(tonumber(cfg.Default) or min, min, max))
+        function opt:SetValue(v)
+            v = tonumber(v)
+            if not v then return end
+            v = math.clamp(math.floor(v * mult + 0.5) / mult, min, max)
+            self.Value = v
+            if self._render then self._render() end
+            if cb then pcall(cb, v) end
+            self:_fire(v)
+        end
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order)
+            vlist(row, 6)
+            local title = textBlock(row, cfg.Title, cfg.Description, 0)
+            local holder = new("Frame", {
+                Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1, LayoutOrder = 2,
+            }, row)
+            local bar = corner(new("Frame", {
+                AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
+                Size = UDim2.new(1, 0, 0, 6), BackgroundColor3 = C.off, BorderSizePixel = 0,
+            }, holder), 3)
+            local fill = corner(new("Frame", {
+                Size = UDim2.fromScale(0, 1), BackgroundColor3 = C.accent, BorderSizePixel = 0,
+            }, bar), 3)
+            corner(new("Frame", {
+                AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.fromOffset(14, 14), BackgroundColor3 = C.white, BorderSizePixel = 0,
+            }, fill), 7)
+            local fmt = "%." .. tostring(rnd) .. "f"
+            opt._render = function()
+                local ratio = (opt.Value - min) / (max - min)
+                fill.Size = UDim2.fromScale(math.clamp(ratio, 0, 1), 1)
+                title.Text = (cfg.Title or "") .. "   [" .. string.format(fmt, opt.Value) .. "]"
+            end
+            opt._render()
+            local function setFromX(x)
+                local w = bar.AbsoluteSize.X
+                if w <= 0 then return end
+                local alpha = math.clamp((x - bar.AbsolutePosition.X) / w, 0, 1)
+                opt:SetValue(min + (max - min) * alpha)
+            end
+            holder.InputBegan:Connect(function(input)
+                if isPointer(input) then
+                    page.ScrollingEnabled = false
+                    drag = { kind = "slider", page = page, setX = setFromX }
+                    setFromX(input.Position.X)
+                end
+            end)
+        end)
+        if cb then pcall(cb, opt.Value) end
+        return opt
+    end
+
+    function Tab:AddDropdown(id, cfg)
+        local cb = cfg.Callback
+        local opt = newOption(id, "Dropdown", nil)
+        opt.Values = cfg.Values or {}
+        local d = cfg.Default
+        if type(d) == "number" then d = opt.Values[d] end
+        opt.Value = d
+        function opt:SetValue(v)
+            if type(v) == "number" then v = self.Values[v] end
+            self.Value = v
+            if self._render then self._render() end
+            if cb and v ~= nil then pcall(cb, v) end
+            self:_fire(v)
+        end
+        function opt:SetValues(vals)
+            self.Values = vals or {}
+            if self._populate then self._populate() end
+        end
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order)
+            vlist(row, 6)
+            textBlock(row, cfg.Title, cfg.Description, 0)
+            local head = corner(new("TextButton", {
+                Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = C.off, BorderSizePixel = 0,
+                Text = "", LayoutOrder = 2, AutoButtonColor = true,
+            }, row), 5)
+            local label = new("TextLabel", {
+                Size = UDim2.new(1, -28, 1, 0), Position = UDim2.fromOffset(8, 0), BackgroundTransparency = 1,
+                Text = "", TextColor3 = C.text, Font = Enum.Font.Gotham, TextSize = 12,
+                TextXAlignment = LEFT, TextTruncate = Enum.TextTruncate.AtEnd,
+            }, head)
+            new("TextLabel", {
+                AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(14, 14),
+                BackgroundTransparency = 1, Text = "v", TextColor3 = C.sub, Font = Enum.Font.GothamBold, TextSize = 12,
+            }, head)
+            local list = corner(new("ScrollingFrame", {
+                Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = C.bg, BorderSizePixel = 0,
+                ScrollBarThickness = 3, CanvasSize = UDim2.new(), AutomaticCanvasSize = AUTO_Y,
+                Visible = false, LayoutOrder = 3,
+            }, row), 5)
+            vlist(list, 2)
+            opt._render = function()
+                label.Text = tostring(opt.Value ~= nil and opt.Value or "-")
+            end
+            opt._populate = function()
+                for _, child in ipairs(list:GetChildren()) do
+                    if child:IsA("TextButton") then child:Destroy() end
+                end
+                for i, val in ipairs(opt.Values) do
+                    local b = new("TextButton", {
+                        Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = (val == opt.Value) and C.action or C.row,
+                        BorderSizePixel = 0, Text = tostring(val), TextColor3 = C.text, Font = Enum.Font.Gotham,
+                        TextSize = 12, LayoutOrder = i, TextTruncate = Enum.TextTruncate.AtEnd,
+                    }, list)
+                    b.MouseButton1Click:Connect(function()
+                        list.Visible = false
+                        opt:SetValue(val)
+                    end)
+                end
+                list.Size = UDim2.new(1, 0, 0, math.min(#opt.Values * 28, 140))
+                opt._render()
+            end
+            opt._populate()
+            head.MouseButton1Click:Connect(function()
+                if not list.Visible then opt._populate() end
+                list.Visible = not list.Visible
+            end)
+        end)
+        if cb and opt.Value ~= nil then pcall(cb, opt.Value) end
+        return opt
+    end
+
+    function Tab:AddInput(id, cfg)
+        local cb = cfg.Callback
+        local opt = newOption(id, "Input", tostring(cfg.Default or ""))
+        function opt:SetValue(v)
+            self.Value = tostring(v or "")
+            if self._render then self._render() end
+            if cb then pcall(cb, self.Value) end
+            self:_fire(self.Value)
+        end
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order)
+            vlist(row, 6)
+            textBlock(row, cfg.Title, cfg.Description, 0)
+            local box = corner(new("TextBox", {
+                Size = UDim2.new(1, 0, 0, 28), BackgroundColor3 = C.off, BorderSizePixel = 0,
+                Text = opt.Value, PlaceholderText = cfg.Placeholder or "", PlaceholderColor3 = C.sub,
+                TextColor3 = C.text, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = LEFT,
+                ClearTextOnFocus = false, LayoutOrder = 2,
+            }, row), 5)
+            pad(box, 8, 0, 8, 0)
+            opt._render = function()
+                if box.Text ~= opt.Value then box.Text = opt.Value end
+            end
+            box:GetPropertyChangedSignal("Text"):Connect(function()
+                if box.Text ~= opt.Value then
+                    opt.Value = box.Text
+                    if cb then pcall(cb, opt.Value) end
+                    opt:_fire(opt.Value)
+                end
+            end)
+        end)
+        return opt
+    end
+
+    function Tab:AddButton(cfg)
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order, C.action)
+            textBlock(row, cfg.Title, cfg.Description, 0)
+            local hit = new("TextButton", {
+                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", ZIndex = 3,
+            }, row)
+            hit.MouseButton1Click:Connect(function()
+                if cfg.Callback then
+                    task.spawn(function()
+                        local ok, err = pcall(cfg.Callback)
+                        if not ok then warn("[Mourier] " .. tostring(err)) end
+                    end)
+                end
+            end)
+        end)
+    end
+
+    function Tab:AddParagraph(cfg)
+        local obj = { Title = cfg.Title or "", Content = cfg.Content or "" }
+        function obj:SetDesc(text)
+            self.Content = tostring(text)
+            if self._d then self._d.Text = self.Content end
+        end
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order, C.bar)
+            local _, d = textBlock(row, obj.Title, obj.Content ~= "" and obj.Content or " ", 0)
+            obj._d = d
+        end)
+        return obj
+    end
+
+    function Tab:AddKeybind(id, cfg)
+        local cb = cfg.Callback
+        local opt = newOption(id, "Keybind", tostring(cfg.Default or "None"))
+        function opt:SetValue(v)
+            self.Value = tostring(v or "None")
+            if self._render then self._render() end
+            self:_fire(self.Value)
+        end
+        function opt:_run()
+            if cb then
+                task.spawn(function()
+                    local ok, err = pcall(cb, true)
+                    if not ok then warn("[Mourier] " .. tostring(err)) end
+                end)
+            end
+        end
+        table.insert(keybinds, opt)
+        table.insert(self._builders, function(page, order)
+            local row = makeRow(page, order)
+            textBlock(row, cfg.Title, cfg.Description, 96)
+            local keyBtn = corner(new("TextButton", {
+                AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -36, 0.5, 0),
+                Size = UDim2.fromOffset(56, 24), BackgroundColor3 = C.off, BorderSizePixel = 0,
+                Text = "", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 12,
+            }, row), 5)
+            local runBtn = corner(new("TextButton", {
+                AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+                Size = UDim2.fromOffset(30, 24), BackgroundColor3 = C.accent, BorderSizePixel = 0,
+                Text = "GO", TextColor3 = C.white, Font = Enum.Font.GothamBold, TextSize = 11,
+            }, row), 5)
+            opt._render = function()
+                keyBtn.Text = (listening == opt) and "..." or opt.Value
+            end
+            opt._render()
+            keyBtn.MouseButton1Click:Connect(function()
+                local previous = listening
+                listening = opt
+                if previous and previous._render then previous._render() end
+                opt._render()
+            end)
+            runBtn.MouseButton1Click:Connect(function()
+                opt:_run()
+            end)
+        end)
+        return opt
+    end
+
+    -- NOTIFY ------------------------------------------------------------
+    function Lib:Notify(tbl)
+        if not toastHolder then return end
+        tbl = tbl or {}
+        if toastCount >= 4 then return end
+        toastCount = toastCount + 1
+        local toast = corner(new("Frame", {
+            Size = UDim2.new(1, 0, 0, 0), AutomaticSize = AUTO_Y, BackgroundColor3 = C.bar, BorderSizePixel = 0,
+        }, toastHolder), 8)
+        pad(toast, 10, 8, 10, 8)
+        vlist(toast, 2)
+        new("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 0), AutomaticSize = AUTO_Y, BackgroundTransparency = 1,
+            Text = tostring(tbl.Title or ""), TextColor3 = C.accent, Font = Enum.Font.GothamBold, TextSize = 13,
+            TextWrapped = true, TextXAlignment = LEFT, LayoutOrder = 1,
+        }, toast)
+        new("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 0), AutomaticSize = AUTO_Y, BackgroundTransparency = 1,
+            Text = tostring(tbl.Content or ""), TextColor3 = C.text, Font = Enum.Font.Gotham, TextSize = 11,
+            TextWrapped = true, TextXAlignment = LEFT, LayoutOrder = 2,
+        }, toast)
+        task.delay(tonumber(tbl.Duration) or 4, function()
+            toastCount = math.max(0, toastCount - 1)
+            if toast.Parent then toast:Destroy() end
+        end)
+    end
+
+    -- WINDOW ------------------------------------------------------------
+    function Lib:CreateWindow(o)
+        local toggleKey = o.ToggleKey or Enum.KeyCode.RightControl
+
+        gui = new("ScreenGui", {
+            Name = "MourierLite", ResetOnSpawn = false, DisplayOrder = 1000,
+            ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true,
+        })
+        local parented = false
+        if gethui then
+            parented = pcall(function() gui.Parent = gethui() end) and gui.Parent ~= nil
+        end
+        if not parented then
+            parented = pcall(function() gui.Parent = CoreGui end) and gui.Parent ~= nil
+        end
+        if not parented then
+            gui.Parent = PlayersService.LocalPlayer:WaitForChild("PlayerGui")
+        end
+
+        local camera = workspace.CurrentCamera
+        local vp = camera and camera.ViewportSize or Vector2.new(800, 600)
+        local w = math.max(300, math.min(560, vp.X - 24))
+        local h = math.max(220, math.min(360, vp.Y - 70))
+        local sideW = (w < 440) and 92 or 128
+
+        frame = corner(new("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.fromOffset(w, h), BackgroundColor3 = C.bg, BorderSizePixel = 0,
+        }, gui), 10)
+
+        local titleBar = corner(new("Frame", {
+            Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.bar, BorderSizePixel = 0, Active = true,
+        }, frame), 10)
+        new("Frame", {
+            Position = UDim2.new(0, 0, 1, -10), Size = UDim2.new(1, 0, 0, 10),
+            BackgroundColor3 = C.bar, BorderSizePixel = 0,
+        }, titleBar)
+        new("TextLabel", {
+            Position = UDim2.fromOffset(12, 3), Size = UDim2.new(1, -60, 0, 16), BackgroundTransparency = 1,
+            Text = o.Title or "Window", TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 13,
+            TextXAlignment = LEFT, TextTruncate = Enum.TextTruncate.AtEnd,
+        }, titleBar)
+        new("TextLabel", {
+            Position = UDim2.fromOffset(12, 18), Size = UDim2.new(1, -60, 0, 13), BackgroundTransparency = 1,
+            Text = o.SubTitle or "", TextColor3 = C.sub, Font = Enum.Font.Gotham, TextSize = 10,
+            TextXAlignment = LEFT, TextTruncate = Enum.TextTruncate.AtEnd,
+        }, titleBar)
+        local hideBtn = corner(new("TextButton", {
+            AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(28, 22),
+            BackgroundColor3 = C.off, BorderSizePixel = 0, Text = "-", TextColor3 = C.text,
+            Font = Enum.Font.GothamBold, TextSize = 16,
+        }, titleBar), 5)
+
+        titleBar.InputBegan:Connect(function(input)
+            if isPointer(input) then
+                drag = { kind = "move", start = input.Position, from = frame.Position }
+            end
+        end)
+
+        local sidebar = new("ScrollingFrame", {
+            Position = UDim2.fromOffset(0, 38), Size = UDim2.new(0, sideW, 1, -38), BackgroundColor3 = C.side,
+            BorderSizePixel = 0, ScrollBarThickness = 0, CanvasSize = UDim2.new(), AutomaticCanvasSize = AUTO_Y,
+        }, frame)
+        pad(sidebar, 6, 4, 6, 4)
+        vlist(sidebar, 4)
+
+        local content = new("Frame", {
+            Position = UDim2.fromOffset(sideW, 38), Size = UDim2.new(1, -sideW, 1, -38),
+            BackgroundTransparency = 1, BorderSizePixel = 0,
+        }, frame)
+
+        local Window = {}
+        local tabs = {}
+        local selected = nil
+
+        local function select(i)
+            local tab = tabs[i]
+            if not tab then return end
+            if selected and tabs[selected] then
+                tabs[selected].page.Visible = false
+                tabs[selected].button.BackgroundColor3 = C.side
+                tabs[selected].button.TextColor3 = C.sub
+            end
+            selected = i
+            if not tab.built then
+                tab.built = true
+                for order, builder in ipairs(tab.builders) do
+                    local ok, err = pcall(builder, tab.page, order)
+                    if not ok then warn("[Mourier GUI] " .. tostring(err)) end
+                end
+            end
+            tab.page.Visible = true
+            tab.button.BackgroundColor3 = C.action
+            tab.button.TextColor3 = C.text
+        end
+
+        function Window:AddTab(cfg)
+            local index = #tabs + 1
+            local button = corner(new("TextButton", {
+                Size = UDim2.new(1, 0, 0, 30), BackgroundColor3 = C.side, BorderSizePixel = 0,
+                Text = cfg.Title or ("Tab " .. index), TextColor3 = C.sub, Font = Enum.Font.GothamMedium,
+                TextSize = 11, TextWrapped = true, LayoutOrder = index, AutoButtonColor = false,
+            }, sidebar), 6)
+            local page = new("ScrollingFrame", {
+                Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0,
+                ScrollBarThickness = 3, CanvasSize = UDim2.new(), AutomaticCanvasSize = AUTO_Y, Visible = false,
+            }, content)
+            pad(page, 8, 2, 10, 8)
+            vlist(page, 6)
+            local tab = setmetatable({ _builders = {} }, Tab)
+            tab.builders = tab._builders
+            tab.page = page
+            tab.button = button
+            tab.built = false
+            tabs[index] = tab
+            button.MouseButton1Click:Connect(function()
+                select(index)
+            end)
+            return tab
+        end
+
+        function Window:SelectTab(i)
+            select(i)
+        end
+
+        -- toast stack
+        toastHolder = new("Frame", {
+            AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 12), Size = UDim2.fromOffset(240, 0),
+            AutomaticSize = AUTO_Y, BackgroundTransparency = 1, ZIndex = 10,
+        }, gui)
+        vlist(toastHolder, 6)
+
+        -- floating toggle button
+        local float = corner(new("TextButton", {
+            Position = UDim2.new(0, 10, 0.5, -70), Size = UDim2.fromOffset(42, 42), BackgroundColor3 = C.accent,
+            BorderSizePixel = 0, Text = "MC", TextColor3 = C.white, Font = Enum.Font.GothamBold, TextSize = 13,
+            ZIndex = 20,
+        }, gui), 21)
+
+        local function setVisible(v)
+            frame.Visible = v
+        end
+
+        hideBtn.MouseButton1Click:Connect(function()
+            setVisible(false)
+        end)
+
+        float.InputBegan:Connect(function(input)
+            if isPointer(input) then
+                drag = { kind = "float", start = input.Position, from = float.Position, moved = 0, target = float }
+            end
+        end)
+
+        table.insert(conns, UIS.InputChanged:Connect(function(input)
+            if not drag then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+                return
+            end
+            if drag.kind == "slider" then
+                drag.setX(input.Position.X)
+            else
+                local delta = input.Position - drag.start
+                local target = (drag.kind == "float") and float or frame
+                if drag.kind == "float" then
+                    drag.moved = math.max(drag.moved, math.abs(delta.X) + math.abs(delta.Y))
+                end
+                target.Position = UDim2.new(
+                    drag.from.X.Scale, drag.from.X.Offset + delta.X,
+                    drag.from.Y.Scale, drag.from.Y.Offset + delta.Y
+                )
+            end
+        end))
+
+        table.insert(conns, UIS.InputEnded:Connect(function(input)
+            if not drag or not isPointer(input) then return end
+            local finished = drag
+            drag = nil
+            if finished.kind == "slider" then
+                finished.page.ScrollingEnabled = true
+            elseif finished.kind == "float" and finished.moved < 6 then
+                setVisible(not frame.Visible)
+            end
+        end))
+
+        table.insert(conns, UIS.InputBegan:Connect(function(input, processed)
+            if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+            if listening then
+                local opt = listening
+                listening = nil
+                if input.KeyCode ~= Enum.KeyCode.Escape and input.KeyCode ~= Enum.KeyCode.Unknown then
+                    opt:SetValue(input.KeyCode.Name)
+                elseif opt._render then
+                    opt._render()
+                end
+                return
+            end
+            if processed then return end
+            if input.KeyCode == toggleKey then
+                setVisible(not frame.Visible)
+                return
+            end
+            local name = input.KeyCode.Name
+            for _, opt in ipairs(keybinds) do
+                if opt.Value == name then
+                    opt:_run()
+                end
+            end
+        end))
+
+        return Window
+    end
+
+    function Lib:GetGui()
+        return gui
+    end
+
+    function Lib:Track(connection)
+        table.insert(conns, connection)
+    end
+
+    function Lib:Destroy()
+        for _, c in ipairs(conns) do
+            pcall(function() c:Disconnect() end)
+        end
+        table.clear(conns)
+        if gui then
+            pcall(function() gui:Destroy() end)
+            gui = nil
+        end
+    end
+
+    return Lib
+end)()
+local Window = Lite:CreateWindow({
+    Title = "Mourier Client — Unstable SMP [v3.1]",
+    SubTitle = "Sword & Mace PvP | Keystrokes & CPS | Packs  •  RightCtrl or MC button",
+    ToggleKey = Enum.KeyCode.RightControl,
+})
+local Tabs = {
+    Mace = Window:AddTab({ Title = "Mace God", Icon = "hammer" }),
+    Sword = Window:AddTab({ Title = "Sword PvP", Icon = "sword" }),
+    Combat = Window:AddTab({ Title = "Combat / PvP", Icon = "swords" }),
+    Utility = Window:AddTab({ Title = "Totem & Gear", Icon = "shield" }),
+    Movement = Window:AddTab({ Title = "Movement", Icon = "wind" }),
+    Visuals = Window:AddTab({ Title = "HUD & Visuals", Icon = "eye" }),
+    Packs = Window:AddTab({ Title = "Resource Packs [Beta]", Icon = "image" }),
+}
+Tabs.Sword:AddParagraph({
+    Title = "Java 1.21 / No-Mace Sword Suite",
+    Content = "Optimized for Unstable SMP's No-Mace server: i-frame timing, 4.5m Spear->Sword swap, legit crit-hops, W-tap, survival & Target HUD."
+})
+Tabs.Sword:AddToggle("SwordIFrameSync", {
+    Title = "i-Frame Hit Sync (Hurt Immunity Wait)",
+    Description = "Listens to Net hurt events & holds swings until enemy 0.5s invulnerability expires",
+    Default = Cfg.SwordIFrameSync,
+    Callback = function(v) Cfg.SwordIFrameSync = v end
+})
+Tabs.Sword:AddToggle("SwordReachSwap", {
+    Title = "4.5m Spear -> Sword 1-Tick Reach Swap",
+    Description = "Uses Hands u96 spear reach (4.5m) on a 1-tick swap to Sword for extended hits",
+    Default = Cfg.SwordReachSwap,
+    Callback = function(v) Cfg.SwordReachSwap = v end
+})
+Tabs.Sword:AddToggle("SwordCritHop", {
+    Title = "Legit Auto Crit-Hop",
+    Description = "Natively jumps right before sword cooldown & i-frames align to land real falling crits",
+    Default = Cfg.SwordCritHop,
+    Callback = function(v) Cfg.SwordCritHop = v end
+})
+Tabs.Sword:AddToggle("SwordWTap", {
+    Title = "Auto W-Tap / Sprint Reset",
+    Description = "Sprints on hit tick then drops state.sprinting for 1 tick to chain max knockback",
+    Default = Cfg.SwordWTap,
+    Callback = function(v) Cfg.SwordWTap = v end
+})
+Tabs.Sword:AddToggle("SwordJumpReset", {
+    Title = "Auto Jump-Reset (Knockback Cancel)",
+    Description = "Natively jumps on incoming melee knockback ticks via Input.setVirtual",
+    Default = Cfg.SwordJumpReset,
+    Callback = function(v) Cfg.SwordJumpReset = v end
+})
+Tabs.Sword:AddToggle("SwordTriggerBot", {
+    Title = "Legit Crosshair TriggerBot",
+    Description = "Auto-swings at cooldown with zero silent rotation only when crosshair aims on enemy",
+    Default = Cfg.SwordTriggerBot,
+    Callback = function(v) Cfg.SwordTriggerBot = v end
+})
+Tabs.Sword:AddToggle("SwordAimAssist", {
+    Title = "Smooth Aim Assist",
+    Description = "Gently pulls camera yaw/pitch toward nearest target within FOV while holding melee",
+    Default = Cfg.SwordAimAssist,
+    Callback = function(v) Cfg.SwordAimAssist = v end
+})
+Tabs.Sword:AddSlider("AimAssistFOV", {
+    Title = "Aim Assist FOV (Degrees)",
+    Default = Cfg.AimAssistFOV,
+    Min = 15,
+    Max = 140,
+    Rounding = 0,
+    Callback = function(v) Cfg.AimAssistFOV = tonumber(v) or 70 end
+})
+Tabs.Sword:AddSlider("AimAssistSmooth", {
+    Title = "Aim Assist Smoothness",
+    Description = "Higher values snap faster; 0.25-0.35 feels human and sticky",
+    Default = Cfg.AimAssistSmooth,
+    Min = 0.05,
+    Max = 0.85,
+    Rounding = 2,
+    Callback = function(v) Cfg.AimAssistSmooth = tonumber(v) or 0.28 end
+})
+Tabs.Sword:AddToggle("AutoGapple", {
+    Title = "Auto-Gapple (Low HP Eat)",
+    Description = "Pauses swings & eats Enchanted/Golden Apple when Health + Absorption <= threshold",
+    Default = Cfg.AutoGapple,
+    Callback = function(v) Cfg.AutoGapple = v end
+})
+Tabs.Sword:AddSlider("AutoGappleHP", {
+    Title = "Auto-Gapple Threshold (HP + Absorption)",
+    Default = Cfg.AutoGappleHP,
+    Min = 4,
+    Max = 22,
+    Rounding = 1,
+    Callback = function(v) Cfg.AutoGappleHP = tonumber(v) or 11 end
+})
+Tabs.Sword:AddToggle("AutoBuffPots", {
+    Title = "Auto Splash Potion (Heal / Speed / Strength)",
+    Description = "1-tick splashes Instant Health when low or Speed/Strength when missing & returns Sword",
+    Default = Cfg.AutoBuffPots,
+    Callback = function(v) Cfg.AutoBuffPots = v end
+})
+Tabs.Sword:AddToggle("AutoShieldBlock", {
+    Title = "Reactive Auto-Shield (Between Swings)",
+    Description = "Raises shield during sword cooldown / enemy i-frames & drops cleanly to strike",
+    Default = Cfg.AutoShieldBlock,
+    Callback = function(v) Cfg.AutoShieldBlock = v end
+})
+Tabs.Sword:AddToggle("TargetHUD", {
+    Title = "Floating Target HUD Card (Draggable)",
+    Description = "Displays target HP, Absorption, Kit, Distance, Shield & i-Frame countdown",
+    Default = Cfg.TargetHUD,
+    Callback = function(v) Cfg.TargetHUD = v end
+})
+Tabs.Mace:AddToggle("AutoMace", {
+    Title = "Auto-Mace Air Smash (Native Pipeline)",
+    Description = "Queues native attack on the exact tick you fall within 3.0m of an enemy's head/body",
+    Default = Cfg.AutoMace,
+    Callback = function(v) Cfg.AutoMace = v end
+})
+Tabs.Mace:AddToggle("Mace1TickSwap", {
+    Title = "1-Tick Sword -> Mace Swap (Native u96)",
+    Description = "Hold Sword for 3x faster charge; natively swaps & smashes on the exact tick you enter range",
+    Default = Cfg.Mace1TickSwap,
+    Callback = function(v) Cfg.Mace1TickSwap = v end
+})
+Tabs.Mace:AddToggle("MaceDualSmart", {
+    Title = "Smart Dual-Mace Selector (Gambit vs Crucible)",
+    Description = "Uses Crucible (Breach IV) on low falls (<=5.5m) & Gambit (Density V + WindBurst) on high falls",
+    Default = Cfg.MaceDualSmart,
+    Callback = function(v) Cfg.MaceDualSmart = v end
+})
+Tabs.Mace:AddToggle("BreachSwap", {
+    Title = "1-Tick Breach Swap (Sword / Spear -> Breach Mace)",
+    Description = "Swaps Sword or Spear (4.5m reach) -> Breach IV Mace on ground/crit swings & manual clicks",
+    Default = Cfg.BreachSwap,
+    Callback = function(v) Cfg.BreachSwap = v end
+})
+Tabs.Mace:AddDropdown("BreachSwapMode", {
+    Title = "Breach Swap Weapon Source",
+    Description = "Choose whether Breach Swap activates from Sword, Spear (4.5m reach), or both",
+    Values = { "Auto (Sword & Spear)", "Sword -> Breach", "Spear -> Breach (4.5m)" },
+    Multi = false,
+    Default = Cfg.BreachSwapMode,
+    Callback = function(v)
+        if type(v) == "string" then
+            Cfg.BreachSwapMode = v
+        end
+    end
+})
+Tabs.Mace:AddToggle("MaceElytraDive", {
+    Title = "Auto Elytra-Dive Mace Bomber",
+    Description = "Auto-swaps Elytra -> Hotbar Chestplate 1 tick before smash so server gliding state syncs cleanly",
+    Default = Cfg.MaceElytraDive,
+    Callback = function(v) Cfg.MaceElytraDive = v end
+})
+Tabs.Mace:AddToggle("MaceSilentAim", {
+    Title = "Mace Silent-Aim (Closest-Box Point)",
+    Description = "Aims at the closest point of enemy hitbox (top of head when falling) & restores camera",
+    Default = Cfg.MaceSilentAim,
+    Callback = function(v) Cfg.MaceSilentAim = v end
+})
+Tabs.Mace:AddToggle("MaceFallSpoof", {
+    Title = "[RISKY] Mace Fall-Distance Spoofer",
+    Description = "Spoofs fallDistance on smash tick (Keep OFF for 100% stealth; use Wind-Charge Jump instead)",
+    Default = Cfg.MaceFallSpoof,
+    Callback = function(v) Cfg.MaceFallSpoof = v end
+})
+Tabs.Mace:AddSlider("MaceSpoofHeight", {
+    Title = "Spoofed Fall Height (Blocks)",
+    Description = "Fall distance used when Fall Spoofer is enabled",
+    Default = Cfg.MaceSpoofHeight,
+    Min = 3,
+    Max = 35,
+    Rounding = 1,
+    Callback = function(v) Cfg.MaceSpoofHeight = tonumber(v) or 12 end
+})
+Tabs.Mace:AddKeybind("WindJumpKey", {
+    Title = "Instant Wind-Charge Jump + Mace Macro",
+    Description = "Natively jumps & fires Wind Charge straight down via Input.setVirtual & swaps back to Sword",
+    Mode = "Toggle",
+    Default = savedKeybinds.WindJumpKey or "R",
+    Callback = function()
+        doWindChargeJump()
+    end
+})
+Tabs.Combat:AddToggle("KillAura", {
+    Title = "Java 1.21 KillAura (Cooldown-Aware)",
+    Description = "Automatically attacks nearest enemy when weapon cooldown reaches threshold",
+    Default = Cfg.KillAura,
+    Callback = function(v) Cfg.KillAura = v end
+})
+Tabs.Combat:AddSlider("KillAuraMinCharge", {
+    Title = "Minimum Attack Charge",
+    Description = "0.90+ guarantees strong/crit hits in Java 1.21 combat",
+    Default = Cfg.KillAuraMinCharge,
+    Min = 0.5,
+    Max = 1.0,
+    Rounding = 2,
+    Callback = function(v) Cfg.KillAuraMinCharge = tonumber(v) or 0.90 end
+})
+Tabs.Combat:AddToggle("AutoShieldBreak", {
+    Title = "Auto Shield-Breaker (Axe Swap-Stun)",
+    Description = "Detects blocking enemies & 1-tick swaps to Netherite Axe to disable their shield",
+    Default = Cfg.AutoShieldBreak,
+    Callback = function(v) Cfg.AutoShieldBreak = v end
+})
+Tabs.Combat:AddToggle("AlwaysCritSpoof", {
+    Title = "[RISKY] Always Critical Hit Spoofer",
+    Description = "Spoofs falling state on ground swings (May trigger server ground-check if overused)",
+    Default = Cfg.AlwaysCritSpoof,
+    Callback = function(v) Cfg.AlwaysCritSpoof = v end
+})
+Tabs.Combat:AddToggle("ReachEnabled", {
+    Title = "[CREATOR ONLY] Custom Reach Extender",
+    Description = "Only active if you have Creator/Operator permissions (prevents Reach anti-cheat kicks)",
+    Default = Cfg.ReachEnabled,
+    Callback = function(v)
+        Cfg.ReachEnabled = v
+        if LocalPlayer:GetAttribute("CreatorPanel") or LocalPlayer:GetAttribute("Operator") then
+            LocalPlayer:SetAttribute("CreatorReach", v and Cfg.ReachValue or nil)
+        end
+    end
+})
+Tabs.Combat:AddSlider("ReachValue", {
+    Title = "Attack Reach (Blocks)",
+    Description = "3.0 = Legit | >3.0 requires Creator/Operator perms",
+    Default = Cfg.ReachValue,
+    Min = 3.0,
+    Max = 6.0,
+    Rounding = 2,
+    Callback = function(v)
+        Cfg.ReachValue = tonumber(v) or 3.0
+        if Cfg.ReachEnabled and (LocalPlayer:GetAttribute("CreatorPanel") or LocalPlayer:GetAttribute("Operator")) then
+            LocalPlayer:SetAttribute("CreatorReach", Cfg.ReachValue)
+        end
+    end
+})
+Tabs.Combat:AddSlider("HitboxExpand", {
+    Title = "Hitbox Expander (Blocks)",
+    Description = "Keep at 0.0 for anti-cheat safety (expanding causes manual rays to miss server box)",
+    Default = Cfg.HitboxExpand,
+    Min = 0.0,
+    Max = 1.0,
+    Rounding = 2,
+    Callback = function(v) Cfg.HitboxExpand = tonumber(v) or 0.0 end
+})
+Tabs.Combat:AddToggle("AutoSpearLunge", {
+    Title = "Auto Spear Lunge (Max Horiz Boost)",
+    Description = "Auto-jabs with Lunge Spear on cooldown at 0 pitch for full horizontal velocity",
+    Default = Cfg.AutoSpearLunge,
+    Callback = function(v) Cfg.AutoSpearLunge = v end
+})
+Tabs.Combat:AddKeybind("SpearLungeKey", {
+    Title = "1-Click Spear Lunge Swap Key",
+    Description = "Instantly 1-tick swaps to Lunge Spear, lunges flat forward/at target, & swaps back",
+    Mode = "Toggle",
+    Default = savedKeybinds.SpearLungeKey or "V",
+    Callback = function()
+        manualSpearLungeUntil = os.clock() + 0.45
+    end
+})
+Tabs.Combat:AddDropdown("SpearLungeMode", {
+    Title = "Spear Lunge Trigger Mode",
+    Values = { "Hold Spear", "On Target Chase", "Always" },
+    Multi = false,
+    Default = table.find({ "Hold Spear", "On Target Chase", "Always" }, Cfg.SpearLungeMode) or 1,
+    Callback = function(v) Cfg.SpearLungeMode = v end
+})
+Tabs.Combat:AddToggle("SpearAutoSwap", {
+    Title = "1-Tick Spear Lunge Swap (Sword <-> Spear)",
+    Description = "Transfers weapon charge when swapping to Lunge Spear & returns to Sword next tick",
+    Default = Cfg.SpearAutoSwap,
+    Callback = function(v) Cfg.SpearAutoSwap = v end
+})
+Tabs.Combat:AddToggle("SpearFlatAim", {
+    Title = "Flatten Pitch on Lunge (Full Speed)",
+    Description = "Silently sets pitch = 0 during lunge tick so looking down/up never weakens dash",
+    Default = Cfg.SpearFlatAim,
+    Callback = function(v) Cfg.SpearFlatAim = v end
+})
+Tabs.Combat:AddSlider("SpearChaseRange", {
+    Title = "On-Target Lunge Chase Range (Blocks)",
+    Description = "Max distance to auto-lunge toward enemies in On Target Chase mode",
+    Default = Cfg.SpearChaseRange,
+    Min = 5,
+    Max = 30,
+    Rounding = 0,
+    Callback = function(v) Cfg.SpearChaseRange = math.round(tonumber(v) or 18) end
+})
+Tabs.Combat:AddToggle("TNTCartAura", {
+    Title = "Auto TNT Cart PvP (Rail + Multi-Cart + Detonate)",
+    Description = "Automatically places rail under enemies, stacks TNT Minecarts, & shoots/lights them",
+    Default = Cfg.TNTCartAura,
+    Callback = function(v) Cfg.TNTCartAura = v end
+})
+Tabs.Combat:AddKeybind("TNTCartKey", {
+    Title = "1-Click TNT Cart Combo Macro",
+    Description = "Instantly places rail, stacks TNT Minecarts, and detonates on target (or crosshair)",
+    Mode = "Toggle",
+    Default = savedKeybinds.TNTCartKey or "C",
+    Callback = function()
+        triggerTNTCartBurst(true)
+    end
+})
+Tabs.Combat:AddSlider("CartCount", {
+    Title = "TNT Carts Per Burst",
+    Description = "Number of TNT Minecarts to stack from hotbar per combo (2-3 = instant kill)",
+    Default = Cfg.CartCount,
+    Min = 1,
+    Max = 4,
+    Rounding = 0,
+    Callback = function(v) Cfg.CartCount = math.round(tonumber(v) or 2) end
+})
+Tabs.Combat:AddDropdown("CartDetonateMode", {
+    Title = "TNT Cart Detonation Method",
+    Values = { "Auto", "Flame Bow", "Flint & Steel", "Punch" },
+    Multi = false,
+    Default = table.find({ "Auto", "Flame Bow", "Flint & Steel", "Punch" }, Cfg.CartDetonateMode) or 1,
+    Callback = function(v) Cfg.CartDetonateMode = v end
+})
+Tabs.Combat:AddSlider("CartBowTicks", {
+    Title = "Flame Bow Charge Ticks (1 tick = 50ms)",
+    Description = "5 ticks = 0.25s rapid flame shot onto the stacked TNT carts",
+    Default = Cfg.CartBowTicks,
+    Min = 3,
+    Max = 15,
+    Rounding = 0,
+    Callback = function(v) Cfg.CartBowTicks = math.round(tonumber(v) or 5) end
+})
+Tabs.Utility:AddToggle("AutoTotem", {
+    Title = "Stealth Auto-Totem (Hotbar & Open/Close Inv)",
+    Description = "Replenishes Totem into offhand using native hotbar swap or safe open/close inventory packet",
+    Default = Cfg.AutoTotem,
+    Callback = function(v) Cfg.AutoTotem = v end
+})
+Tabs.Utility:AddToggle("AutoWaterClutch", {
+    Title = "Auto Water-Bucket Clutch (Legit NoFall)",
+    Description = "Natively places water before hitting the ground from lethal falls (>10m)",
+    Default = Cfg.AutoWaterClutch,
+    Callback = function(v) Cfg.AutoWaterClutch = v end
+})
+Tabs.Utility:AddKeybind("ElytraSwapKey", {
+    Title = "Quick Swap Chestplate <-> Elytra",
+    Description = "Safely swaps your equipped Chestplate and Elytra from hotbar or inventory",
+    Mode = "Toggle",
+    Default = savedKeybinds.ElytraSwapKey or "X",
+    Callback = function()
+        swapChestArmor(nil, false)
+    end
+})
+Tabs.Movement:AddToggle("AntiKB", {
+    Title = "Anti-Knockback (Melee KB Reducer)",
+    Description = "Scales incoming melee knockback while preserving server WindCharge/TNT launches",
+    Default = Cfg.AntiKB,
+    Callback = function(v) Cfg.AntiKB = v end
+})
+Tabs.Movement:AddSlider("KBHorizontal", {
+    Title = "Horizontal Knockback %",
+    Description = "50% = Safe Reduction | 0% = Complete Melee Anti-KB",
+    Default = Cfg.KBHorizontal,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(v) Cfg.KBHorizontal = tonumber(v) or 50 end
+})
+Tabs.Movement:AddToggle("NoAttackerSlow", {
+    Title = "Keep Sprint on Hit (No Attacker Slow)",
+    Description = "Prevents losing sprint velocity when hitting enemies",
+    Default = Cfg.NoAttackerSlow,
+    Callback = function(v) Cfg.NoAttackerSlow = v end
+})
+Tabs.Movement:AddToggle("NoWebSlow", {
+    Title = "[RISKY] No Cobweb Slowdown",
+    Description = "Walk and fall through Cobwebs at full speed",
+    Default = Cfg.NoWebSlow,
+    Callback = function(v) Cfg.NoWebSlow = v end
+})
+Tabs.Movement:AddToggle("NoFallDamage", {
+    Title = "[RISKY] Spoof No-Fall Damage",
+    Description = "Resets fallDistance before landing (Prefer Auto Water-Bucket Clutch for stealth)",
+    Default = Cfg.NoFallDamage,
+    Callback = function(v) Cfg.NoFallDamage = v end
+})
+Tabs.Movement:AddToggle("InfElytraRocket", {
+    Title = "[RISKY] Infinite Elytra Rocket Boost",
+    Description = "Maintains firework rocket propulsion continuously while gliding",
+    Default = Cfg.InfElytraRocket,
+    Callback = function(v) Cfg.InfElytraRocket = v end
+})
+Tabs.Movement:AddToggle("SpeedMultEnabled", {
+    Title = "[RISKY] Custom Movement Speed Multiplier",
+    Description = "Overrides Character SpeedMult attribute",
+    Default = Cfg.SpeedMultEnabled,
+    Callback = function(v)
+        Cfg.SpeedMultEnabled = v
+        if not v and LocalPlayer.Character then
+            LocalPlayer.Character:SetAttribute("SpeedMult", 1)
+        end
+    end
+})
+Tabs.Movement:AddSlider("SpeedMultValue", {
+    Title = "Speed Multiplier",
+    Description = "1.0 = Normal, 1.4 = Speed II",
+    Default = Cfg.SpeedMultValue,
+    Min = 1.0,
+    Max = 2.5,
+    Rounding = 2,
+    Callback = function(v) Cfg.SpeedMultValue = tonumber(v) or 1.2 end
+})
+Tabs.Visuals:AddToggle("KeystrokesHUD", {
+    Title = "Mourier Keystrokes & CPS Counter HUD",
+    Description = "Lunar/Feather-style draggable WASD + LMB/RMB CPS + Spacebar & FPS overlay",
+    Default = Cfg.KeystrokesHUD,
+    Callback = function(v) Cfg.KeystrokesHUD = v end
+})
+Tabs.Visuals:AddToggle("KeystrokesShowCPS", {
+    Title = "Show LMB / RMB & CPS Boxes",
+    Description = "Displays Left & Right mouse buttons with real-time Clicks Per Second",
+    Default = Cfg.KeystrokesShowCPS,
+    Callback = function(v) Cfg.KeystrokesShowCPS = v end
+})
+Tabs.Visuals:AddToggle("KeystrokesShowSpace", {
+    Title = "Show Spacebar Indicator",
+    Description = "Displays the bottom jump bar on the Keystrokes overlay",
+    Default = Cfg.KeystrokesShowSpace,
+    Callback = function(v) Cfg.KeystrokesShowSpace = v end
+})
+Tabs.Visuals:AddToggle("KeystrokesRainbow", {
+    Title = "Chroma / Rainbow Keystrokes Highlight",
+    Description = "Cycles chroma accent colors on active keys (OFF = Amethyst Purple)",
+    Default = Cfg.KeystrokesRainbow,
+    Callback = function(v) Cfg.KeystrokesRainbow = v end
+})
+Tabs.Visuals:AddSlider("KeystrokesScale", {
+    Title = "Keystrokes HUD Scale",
+    Description = "Adjusts the size of the Keystrokes & CPS widget",
+    Default = Cfg.KeystrokesScale,
+    Min = 0.6,
+    Max = 1.6,
+    Rounding = 2,
+    Callback = function(v) Cfg.KeystrokesScale = tonumber(v) or 1.0 end
+})
+Tabs.Visuals:AddToggle("ESP", {
+    Title = "Player & Bot ESP (CurrentCamera Stealth)",
+    Description = "Highlights all active targets & displays HP, Kit, Held items, and Shield state",
+    Default = Cfg.ESP,
+    Callback = function(v) Cfg.ESP = v end
+})
+Tabs.Visuals:AddToggle("AntiInvis", {
+    Title = "True-Sight (Reveal Wraith & Invisible Players)",
+    Description = "Reveals invisible players in Visuals memory without touching character attributes",
+    Default = Cfg.AntiInvis,
+    Callback = function(v) Cfg.AntiInvis = v end
+})
+Tabs.Visuals:AddToggle("NativeHitboxes", {
+    Title = "Minecraft F3 Hitboxes & Eye Rays",
+    Description = "Toggles the game's built-in F3 hitbox & look-vector renderer",
+    Default = Cfg.NativeHitboxes,
+    Callback = function(v)
+        Cfg.NativeHitboxes = v
+        pcall(Hitboxes.set, v)
+    end
+})
+Tabs.Visuals:AddToggle("ClientKillEffect", {
+    Title = "Client-Sided Kill Effects (Visual Only)",
+    Description = "Plays your selected kill effect locally on kills (only visible to you)",
+    Default = Cfg.ClientKillEffect,
+    Callback = function(v) Cfg.ClientKillEffect = v end
+})
+Tabs.Visuals:AddDropdown("ClientKillEffectChoice", {
+    Title = "Selected Kill Effect",
+    Description = "Pick any effect from Kill Effects Vault or Random",
+    Values = KILL_EFFECT_OPTIONS,
+    Multi = false,
+    Default = Cfg.ClientKillEffectChoice,
+    Callback = function(v)
+        if type(v) == "string" then
+            Cfg.ClientKillEffectChoice = v
+        end
+    end
+})
+Tabs.Visuals:AddToggle("ClientKillEffectAll", {
+    Title = "Apply Kill Effect To Everyone's Kills",
+    Description = "OFF = your kills only | ON = plays on all nearby kills locally",
+    Default = Cfg.ClientKillEffectAll,
+    Callback = function(v) Cfg.ClientKillEffectAll = v end
+})
+Tabs.Visuals:AddButton({
+    Title = "Preview Selected Kill Effect",
+    Description = "Spawns the chosen kill effect 3 blocks in front of you",
+    Callback = function()
+        previewClientKillEffect()
+    end
+})
+local locateTargetName = ""
+Tabs.Visuals:AddInput("LocateInput", {
+    Title = "Locate Player Across Servers",
+    Description = "Enter username to find their server & region via LocateScreen",
+    Default = "",
+    Placeholder = "Username...",
+    Callback = function(v) locateTargetName = v end
+})
+Tabs.Visuals:AddButton({
+    Title = "Search Player Server",
+    Description = "Opens the built-in Locate UI for the entered username",
+    Callback = function()
+        if locateTargetName ~= "" then
+            LocateScreen.show(locateTargetName)
+        end
+    end
+})
+Tabs.Visuals:AddButton({
+    Title = "Reset All Saved Settings",
+    Description = "Restores Mourier Client toggles, sliders, keybinds, & HUD layout to defaults",
+    Callback = function()
+        isRestoringConfig = true
+        for k, v in pairs(DefaultCfgSnapshot) do
+            Cfg[k] = v
+            local opt = type(Lite.Options) == "table" and Lite.Options[k]
+            if opt and type(opt.SetValue) == "function" then
+                pcall(function() opt:SetValue(v) end)
+            end
+        end
+        savedKeybinds = {
+            WindJumpKey = "R",
+            SpearLungeKey = "V",
+            TNTCartKey = "C",
+            ElytraSwapKey = "X",
+        }
+        for id, key in pairs(savedKeybinds) do
+            local opt = type(Lite.Options) == "table" and Lite.Options[id]
+            if opt and type(opt.SetValue) == "function" then
+                pcall(function() opt:SetValue(key, opt.Mode or "Toggle") end)
+            end
+        end
+        savedKsPos = nil
+        if ksContainer then
+            ksContainer.Position = UDim2.new(0, 18, 0.5, -105)
+        end
+        savedTargetHudPos = nil
+        if ksWidgets.TargetHUD and ksWidgets.TargetHUD.frame then
+            ksWidgets.TargetHUD.frame.Position = UDim2.new(0.5, 42, 0.5, 22)
+        end
+        pcall(Hitboxes.set, Cfg.NativeHitboxes)
+        isRestoringConfig = false
+        saveConfigNow()
+        safeNotify({ Title = "Config Reset", Content = "All settings restored to default and saved.", Duration = 4 })
+    end
+})
+local packStatusPara = Tabs.Packs:AddParagraph({
+    Title = "Active Resource Pack [Beta]",
+    Content = "Current: Vanilla (Default) — Experimental Modrinth loader"
+})
+local function safeNotify(tbl)
+    pcall(function() Lite:Notify(tbl) end)
+end
+local function safeSetDesc(text)
+    pcall(function() packStatusPara:SetDesc(text) end)
+end
+local modrinthQuery = "pvp"
+local modrinthResults = {}
+local selectedSearchLabel = nil
+local modrinthDropdown = nil
+Tabs.Packs:AddInput("ModrinthSearchInput", {
+    Title = "Search Modrinth Resource Packs",
+    Description = "Enter a pack name or keyword (e.g. pvp, mace, bare bones, faithful)",
+    Default = "pvp",
+    Placeholder = "Search Modrinth...",
+    Callback = function(v) modrinthQuery = v end
+})
+modrinthDropdown = Tabs.Packs:AddDropdown("ModrinthResults", {
+    Title = "Search Results",
+    Values = { "(Click 'Search Modrinth' first)" },
+    Multi = false,
+    Default = 1,
+    Callback = function(v) selectedSearchLabel = v end
+})
+Tabs.Packs:AddButton({
+    Title = "Search Modrinth",
+    Description = "Queries Modrinth API for matching Minecraft resource packs",
+    Callback = function()
+        task.spawn(function()
+            local ok, err = pcall(function()
+                local url = "https://api.modrinth.com/v2/search?query="
+                    .. HttpService:UrlEncode(modrinthQuery ~= "" and modrinthQuery or "pvp")
+                    .. "&facets=" .. HttpService:UrlEncode('[["project_type:resourcepack"]]')
+                    .. "&limit=12"
+                local data = HttpService:JSONDecode(game:HttpGet(url))
+                local values = {}
+                modrinthResults = {}
+                for _, hit in ipairs(data.hits or {}) do
+                    local lbl = string.format("%s (%s)", tostring(hit.title), tostring(hit.slug))
+                    modrinthResults[lbl] = hit.slug
+                    table.insert(values, lbl)
+                end
+                if #values == 0 then
+                    values = { "(No packs found)" }
+                end
+                pcall(function()
+                    modrinthDropdown:SetValues(values)
+                    modrinthDropdown:SetValue(values[1])
+                end)
+                selectedSearchLabel = values[1]
+            end)
+            if not ok then
+                safeNotify({ Title = "Modrinth Search Failed", Content = tostring(err), Duration = 5 })
+            end
+        end)
+    end
+})
+Tabs.Packs:AddButton({
+    Title = "Download & Apply Selected Pack",
+    Description = "Downloads the selected Modrinth .zip, unpacks PNGs, and applies live",
+    Callback = function()
+        local slug = selectedSearchLabel and modrinthResults[selectedSearchLabel]
+        if not slug then
+            safeNotify({ Title = "No Pack Selected", Content = "Search Modrinth and select a pack first.", Duration = 4 })
+            return
+        end
+        safeNotify({ Title = "Downloading Pack...", Content = "Fetching " .. slug .. " from Modrinth...", Duration = 4 })
+        task.spawn(function()
+            local ok, ic, hc, cached = pcall(fetchAndApplyModrinth, slug)
+            if ok then
+                safeSetDesc(string.format("Current: %s (%d items, %d HUD/blocks)", slug, ic, hc))
+                safeNotify({
+                    Title = "Resource Pack Applied",
+                    Content = string.format("%s loaded (%d items, %d HUD/blocks)%s", slug, ic, hc, cached and " [cached]" or ""),
+                    Duration = 5
+                })
+            else
+                safeNotify({ Title = "Pack Load Failed", Content = tostring(ic), Duration = 6 })
+            end
+        end)
+    end
+})
+local directSlugInput = ""
+Tabs.Packs:AddInput("ModrinthDirectSlug", {
+    Title = "Direct Modrinth Slug or URL",
+    Description = "Paste a Modrinth URL or project slug (e.g. https://modrinth.com/resourcepack/bare-bones)",
+    Default = "",
+    Placeholder = "slug or modrinth.com/resourcepack/...",
+    Callback = function(v) directSlugInput = v end
+})
+Tabs.Packs:AddButton({
+    Title = "Load Direct Slug / URL",
+    Description = "Downloads & applies the specified Modrinth resource pack",
+    Callback = function()
+        if directSlugInput == "" then return end
+        safeNotify({ Title = "Downloading Pack...", Content = "Fetching " .. directSlugInput .. "...", Duration = 4 })
+        task.spawn(function()
+            local ok, ic, hc, cached = pcall(fetchAndApplyModrinth, directSlugInput)
+            if ok then
+                safeSetDesc(string.format("Current: %s (%d items, %d HUD/blocks)", activePackName, ic, hc))
+                safeNotify({
+                    Title = "Resource Pack Applied",
+                    Content = string.format("%s loaded (%d items, %d HUD/blocks)%s", activePackName, ic, hc, cached and " [cached]" or ""),
+                    Duration = 5
+                })
+            else
+                safeNotify({ Title = "Pack Load Failed", Content = tostring(ic), Duration = 6 })
+            end
+        end)
+    end
+})
+local localDropdown = nil
+local selectedLocalPack = nil
+local function scanLocalPacks()
+    local vals = {}
+    ensureFolder(PACK_ROOT)
+    if listfiles and isfolder and isfolder(PACK_ROOT) then
+        for _, entry in ipairs(listfiles(PACK_ROOT)) do
+            local name = string.match(entry, "([^/\\]+)$")
+            if name then
+                table.insert(vals, name)
+            end
+        end
+    end
+    if #vals == 0 then vals = { "(Drop .zip packs in workspace/MourierPacks)" } end
+    return vals
+end
+localDropdown = Tabs.Packs:AddDropdown("LocalPackDropdown", {
+    Title = "Local Packs (MourierPacks/)",
+    Values = scanLocalPacks(),
+    Multi = false,
+    Default = 1,
+    Callback = function(v) selectedLocalPack = v end
+})
+Tabs.Packs:AddButton({
+    Title = "Refresh & Apply Local Pack",
+    Description = "Scans workspace/MourierPacks/ for .zip or extracted folders and applies the selected one",
+    Callback = function()
+        local vals = scanLocalPacks()
+        pcall(function() localDropdown:SetValues(vals) end)
+        if not selectedLocalPack or selectedLocalPack:sub(1, 1) == "(" then
+            selectedLocalPack = vals[1]
+            pcall(function() localDropdown:SetValue(vals[1]) end)
+        end
+        if not selectedLocalPack or selectedLocalPack:sub(1, 1) == "(" then
+            safeNotify({ Title = "No Local Packs", Content = "Place a .zip resource pack inside workspace/MourierPacks/", Duration = 4 })
+            return
+        end
+        task.spawn(function()
+            local ok, err = pcall(function()
+                if string.match(selectedLocalPack, "%.zip$") then
+                    local raw = readfile(PACK_ROOT .. "/" .. selectedLocalPack)
+                    local folderName = string.gsub(selectedLocalPack, "%.zip$", "")
+                    extractZipTextures(raw, folderName)
+                    local ic, hc = applyPackFromFolder(folderName, selectedLocalPack)
+                    safeSetDesc(string.format("Current: %s (%d items, %d HUD/blocks)", selectedLocalPack, ic, hc))
+                    safeNotify({ Title = "Local Pack Applied", Content = string.format("%s (%d items, %d HUD/blocks)", selectedLocalPack, ic, hc), Duration = 5 })
+                else
+                    local ic, hc = applyPackFromFolder(selectedLocalPack, selectedLocalPack)
+                    safeSetDesc(string.format("Current: %s (%d items, %d HUD/blocks)", selectedLocalPack, ic, hc))
+                    safeNotify({ Title = "Local Pack Applied", Content = string.format("%s (%d items, %d HUD/blocks)", selectedLocalPack, ic, hc), Duration = 5 })
+                end
+            end)
+            if not ok then
+                safeNotify({ Title = "Local Pack Error", Content = tostring(err), Duration = 5 })
+            end
+        end)
+    end
+})
+Tabs.Packs:AddButton({
+    Title = "Reset to Vanilla Textures",
+    Description = "Restores all default Unstable SMP HUD, particle, item, and block textures",
+    Callback = function()
+        resetToVanillaPack()
+        savedPackFolder = nil
+        savedPackName = nil
+        saveConfigNow()
+        safeSetDesc("Current: Vanilla (Default)")
+        safeNotify({ Title = "Vanilla Restored", Content = "All textures reset to default.", Duration = 4 })
+    end
+})
+if type(Lite.Options) == "table" then
+    for id, opt in pairs(Lite.Options) do
+        if type(opt) == "table" and type(opt.OnChanged) == "function" then
+            pcall(function()
+                opt:OnChanged(function(val)
+                    if id == "WindJumpKey" or id == "SpearLungeKey" or id == "TNTCartKey" or id == "ElytraSwapKey" then
+                        savedKeybinds[id] = tostring(opt.Value or val or savedKeybinds[id])
+                    end
+                    scheduleSave()
+                end)
+            end)
+        end
+    end
+end
+local leavingConn = Players.PlayerRemoving:Connect(function(plr)
+    if plr == LocalPlayer then
+        saveConfigNow()
+    end
+end)
+if savedPackFolder and isfolder and isfolder(PACK_ROOT .. "/" .. savedPackFolder) then
+    local folderToRestore = savedPackFolder
+    local nameToRestore = savedPackName or savedPackFolder
+    task.spawn(function()
+        isRestoringConfig = true
+        local ok, ic, hc = pcall(applyPackFromFolder, folderToRestore, nameToRestore)
+        isRestoringConfig = false
+        if ok then
+            safeSetDesc(string.format("Current: %s (%d items, %d HUD/blocks)", nameToRestore, ic, hc))
+        end
+    end)
+end
+-- MOBILE ACTION BUTTONS (double-tap a button to unlock + move it)
+;(function()
+    local MB_FILE = "MourierButtons.json"
+    local mbPos = {}
+    pcall(function()
+        if isfile and readfile and isfile(MB_FILE) then
+            local data = HttpService:JSONDecode(readfile(MB_FILE))
+            if type(data) == "table" then mbPos = data end
+        end
+    end)
+    local mbGui = Lite:GetGui()
+    local mbButtons = {}
+    local prevLungeMode = nil
+    local function onLungeAuto(on)
+        local modeOpt = Lite.Options.SpearLungeMode
+        local swapOpt = Lite.Options.SpearAutoSwap
+        if on then
+            if Cfg.SpearLungeMode ~= "Always" then prevLungeMode = Cfg.SpearLungeMode end
+            if modeOpt then modeOpt:SetValue("Always") else Cfg.SpearLungeMode = "Always" end
+            if swapOpt then swapOpt:SetValue(true) else Cfg.SpearAutoSwap = true end
+        elseif prevLungeMode then
+            if modeOpt then modeOpt:SetValue(prevLungeMode) else Cfg.SpearLungeMode = prevLungeMode end
+            prevLungeMode = nil
+        end
+    end
+    local mbDefs = {
+        { id = "Cart", label = "TNT Cart Combo", text = "TNT CART", run = function() triggerTNTCartBurst(true) end },
+        { id = "Lunge", label = "Spear Lunge (1 shot)", text = "SPEAR LUNGE", run = function() manualSpearLungeUntil = os.clock() + 0.45 end },
+        { id = "LungeAuto", label = "Lunge Auto ON/OFF", text = "LUNGE AUTO", toggle = "AutoSpearLunge", onToggle = onLungeAuto },
+        { id = "Elytra", label = "Elytra Swap", text = "ELYTRA SWAP", run = function() swapChestArmor(nil, false) end },
+    }
+    local COL_IDLE = Color3.fromRGB(52, 40, 96)
+    local COL_ON = Color3.fromRGB(70, 170, 100)
+    local COL_UNLOCK = Color3.fromRGB(240, 190, 60)
+    local BTN_W, BTN_H = 74, 40
+
+    local function mbSave()
+        if not writefile then return end
+        pcall(function() writefile(MB_FILE, HttpService:JSONEncode(mbPos)) end)
+    end
+
+    local function defaultPos(index)
+        return { x = 0.86, y = 0.30 + 0.11 * (index - 1) }
+    end
+
+    for index, def in ipairs(mbDefs) do
+        local pos = mbPos[def.id]
+        if type(pos) ~= "table" or type(pos.x) ~= "number" or type(pos.y) ~= "number" then
+            pos = defaultPos(index)
+        end
+        local btn = Instance.new("TextButton")
+        btn.Name = "MB_" .. def.id
+        btn.Size = UDim2.fromOffset(BTN_W, BTN_H)
+        btn.Position = UDim2.fromScale(math.clamp(pos.x, 0, 0.95), math.clamp(pos.y, 0, 0.95))
+        btn.BackgroundColor3 = COL_IDLE
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.Text = def.text
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        btn.TextWrapped = true
+        btn.ZIndex = 15
+        local cr = Instance.new("UICorner")
+        cr.CornerRadius = UDim.new(0, 8)
+        cr.Parent = btn
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 2
+        stroke.Color = COL_UNLOCK
+        stroke.Enabled = false
+        stroke.Parent = btn
+        btn.Parent = mbGui
+
+        local unlocked = false
+        local lastTap = -10
+        local token = 0
+        local dragging = false
+        local dragStart, dragFrom, moved = nil, nil, 0
+
+        local function refresh()
+            if unlocked then
+                btn.BackgroundColor3 = COL_UNLOCK
+                btn.TextColor3 = Color3.new(0, 0, 0)
+                btn.Text = "MOVE ME"
+            else
+                btn.TextColor3 = Color3.new(1, 1, 1)
+                btn.Text = def.text
+                if def.toggle then
+                    local on = Cfg[def.toggle] and true or false
+                    btn.BackgroundColor3 = on and COL_ON or COL_IDLE
+                    btn.Text = def.text .. (on and "\nON" or "\nOFF")
+                else
+                    btn.BackgroundColor3 = COL_IDLE
+                end
+            end
+            stroke.Enabled = unlocked
+        end
+
+        local function lock()
+            unlocked = false
+            dragging = false
+            token = token + 1
+            local vp = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or Vector2.new(800, 600)
+            local ax, ay = btn.AbsolutePosition.X, btn.AbsolutePosition.Y
+            local sx = math.clamp(ax / vp.X, 0, 1 - BTN_W / vp.X)
+            local sy = math.clamp(ay / vp.Y, 0, 1 - BTN_H / vp.Y)
+            btn.Position = UDim2.fromScale(sx, sy)
+            mbPos[def.id] = { x = sx, y = sy }
+            mbSave()
+            refresh()
+        end
+
+        local function unlock()
+            unlocked = true
+            token = token + 1
+            local mine = token
+            refresh()
+            task.delay(6, function()
+                if unlocked and not dragging and token == mine then lock() end
+            end)
+        end
+
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+                return
+            end
+            if unlocked then
+                dragging = true
+                dragStart = input.Position
+                dragFrom = btn.Position
+                moved = 0
+                return
+            end
+            local now = os.clock()
+            if now - lastTap <= 0.35 then
+                lastTap = 0
+                unlock()
+                return
+            end
+            lastTap = now
+            if def.run then
+                task.spawn(function()
+                    local ok, err = pcall(def.run)
+                    if not ok then warn("[Mourier] " .. tostring(err)) end
+                end)
+            elseif def.toggle then
+                local opt = Lite.Options[def.toggle]
+                if opt then opt:SetValue(not opt.Value) else Cfg[def.toggle] = not Cfg[def.toggle] end
+                refresh()
+            end
+        end)
+
+        Lite:Track(UserInputService.InputChanged:Connect(function(input)
+            if not dragging then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+                return
+            end
+            local delta = input.Position - dragStart
+            moved = math.max(moved, math.abs(delta.X) + math.abs(delta.Y))
+            btn.Position = UDim2.new(dragFrom.X.Scale, dragFrom.X.Offset + delta.X, dragFrom.Y.Scale, dragFrom.Y.Offset + delta.Y)
+        end))
+
+        Lite:Track(UserInputService.InputEnded:Connect(function(input)
+            if not dragging then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+                return
+            end
+            dragging = false
+            lock()
+        end))
+
+        if def.toggle and Lite.Options[def.toggle] then
+            Lite.Options[def.toggle]:OnChanged(function(v)
+                if def.onToggle then def.onToggle(v and true or false) end
+                refresh()
+            end)
+        end
+        refresh()
+        table.insert(mbButtons, { btn = btn, id = def.id, index = index, lock = lock, label = def.label, shown = true })
+    end
+
+    local masterOn = true
+    local function applyVisibility()
+        for _, item in ipairs(mbButtons) do
+            item.btn.Visible = masterOn and item.shown
+        end
+    end
+    local BtnTab = Window:AddTab({ Title = "Mobile Buttons" })
+    BtnTab:AddParagraph({
+        Title = "On-Screen Action Buttons",
+        Content = "Tap = action. Double-tap a button to unlock it (yellow), drag it, release to lock. LUNGE AUTO ON switches Spear Lunge to 'Always' so it lunges without holding the spear."
+    })
+    BtnTab:AddToggle("MobileButtons", {
+        Title = "Show All Action Buttons",
+        Description = "Master switch for every on-screen button",
+        Default = true,
+        Callback = function(v)
+            masterOn = v and true or false
+            applyVisibility()
+        end
+    })
+    for _, item in ipairs(mbButtons) do
+        BtnTab:AddToggle("MobileBtn_" .. item.id, {
+            Title = "Show: " .. item.label,
+            Default = true,
+            Callback = function(v)
+                item.shown = v and true or false
+                applyVisibility()
+            end
+        })
+    end
+    BtnTab:AddButton({
+        Title = "Reset Button Layout",
+        Description = "Puts all on-screen action buttons back in their default column",
+        Callback = function()
+            for _, item in ipairs(mbButtons) do
+                local d = defaultPos(item.index)
+                item.btn.Position = UDim2.fromScale(d.x, d.y)
+                mbPos[item.id] = d
+            end
+            mbSave()
+        end
+    })
+end)()
+Window:SelectTab(Config.NO_MACE and 2 or 1)
+safeNotify({
+    Title = "Mourier Client v3.1 Loaded",
+    Content = configLoadedFromDisk
+        and "Restored your last saved settings, keybinds & HUD layout!"
+        or "Sword PvP, Mace God, Keystrokes + CPS HUD & Resource Packs ready!",
+    Duration = 6
+})
+local env = (getgenv and getgenv()) or _G
+local stateObj = rawget(env, "STATE")
+if type(stateObj) == "table" and stateObj.onCleanup then
+    stateObj.onCleanup(function()
+        isUnloaded = true
+        pcall(Input.setVirtual, "jump", false)
+        pcall(Hands.stopUsing, false)
+        if foreignCallerFn and origU35 then
+            pcall(debug.setupvalue, foreignCallerFn, 1, origU35)
+        end
+        Physics.overlaps = origOverlaps
+        World.rayBox = origRayBox
+        local idx1 = table.find(Controller.beforeTick, onPreTick)
+        if idx1 then table.remove(Controller.beforeTick, idx1) end
+        local idx2 = table.find(Controller.onTick, onPostTick)
+        if idx2 then table.remove(Controller.onTick, idx2) end
+        if renderConn then renderConn:Disconnect() end
+        if leavingConn then leavingConn:Disconnect() end
+        if inputBeganConn then inputBeganConn:Disconnect() end
+        if keystrokesGui then pcall(function() keystrokesGui:Destroy() end) end
+        isRestoringConfig = true
+        pcall(resetToVanillaPack)
+        isRestoringConfig = false
+        Icons.fill = origIconsFill
+        WeaponSkinFX.packKey = origWsfPackKey
+        WeaponSkinFX.packAsset = origWsfPackAsset
+        if origKillEffectsPlay then KillEffects.play = origKillEffectsPlay end
+        if mcWorldDescConn then mcWorldDescConn:Disconnect() end
+        for m in pairs(espCache) do clearESPFor(m) end
+        if espFolder then pcall(function() espFolder:Destroy() end) end
+        pcall(function() Lite:Destroy() end)
+    end)
+end
