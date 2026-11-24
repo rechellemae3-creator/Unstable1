@@ -1,3 +1,67 @@
+-- Mourier Client Lite: crash catcher (shows the error on screen if anything fails to load)
+local function __mourierFatal(message)
+    warn("[Mourier] load failed: " .. tostring(message))
+    pcall(function()
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "MourierError"
+        gui.ResetOnSpawn = false
+        gui.DisplayOrder = 2000
+        gui.IgnoreGuiInset = true
+        local parented = false
+        if gethui then
+            parented = pcall(function() gui.Parent = gethui() end) and gui.Parent ~= nil
+        end
+        if not parented then
+            parented = pcall(function() gui.Parent = game:GetService("CoreGui") end) and gui.Parent ~= nil
+        end
+        if not parented then
+            gui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+        end
+        local frame = Instance.new("Frame")
+        frame.AnchorPoint = Vector2.new(0.5, 0.5)
+        frame.Position = UDim2.fromScale(0.5, 0.5)
+        frame.Size = UDim2.new(0.9, 0, 0, 220)
+        frame.BackgroundColor3 = Color3.fromRGB(40, 20, 28)
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -70, 0, 28)
+        title.Position = UDim2.fromOffset(8, 4)
+        title.BackgroundTransparency = 1
+        title.Text = "Mourier Client failed to load - send this error:"
+        title.TextColor3 = Color3.fromRGB(255, 150, 150)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 13
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = frame
+        local close = Instance.new("TextButton")
+        close.Size = UDim2.fromOffset(54, 24)
+        close.Position = UDim2.new(1, -62, 0, 6)
+        close.BackgroundColor3 = Color3.fromRGB(90, 40, 50)
+        close.Text = "Close"
+        close.TextColor3 = Color3.new(1, 1, 1)
+        close.Font = Enum.Font.GothamBold
+        close.TextSize = 12
+        close.Parent = frame
+        close.MouseButton1Click:Connect(function() gui:Destroy() end)
+        local box = Instance.new("TextBox")
+        box.Position = UDim2.fromOffset(8, 36)
+        box.Size = UDim2.new(1, -16, 1, -44)
+        box.BackgroundColor3 = Color3.fromRGB(24, 12, 16)
+        box.BorderSizePixel = 0
+        box.TextColor3 = Color3.new(1, 1, 1)
+        box.Font = Enum.Font.Code
+        box.TextSize = 12
+        box.TextWrapped = true
+        box.TextXAlignment = Enum.TextXAlignment.Left
+        box.TextYAlignment = Enum.TextYAlignment.Top
+        box.MultiLine = true
+        box.ClearTextOnFocus = false
+        box.Text = string.sub(tostring(message), 1, 1800)
+        box.Parent = frame
+    end)
+end
+local __mourierOk, __mourierErr = xpcall(function()
 -- Unpacked by ZeroVector: the script inside the packed file, as it was written
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -3724,6 +3788,7 @@ local Window = Lite:CreateWindow({
     SubTitle = "Sword & Mace PvP | Keystrokes & CPS | Packs  •  RightCtrl or MC button",
     ToggleKey = Enum.KeyCode.RightControl,
 })
+print("[Mourier] GUI window created (RightCtrl or the MC button toggles it)")
 local Tabs = {
     Mace = Window:AddTab({ Title = "Mace God", Icon = "hammer" }),
     Sword = Window:AddTab({ Title = "Sword PvP", Icon = "sword" }),
@@ -4745,3 +4810,5 @@ if type(stateObj) == "table" and stateObj.onCleanup then
         pcall(function() Lite:Destroy() end)
     end)
 end
+end, function(e) return debug.traceback(tostring(e), 2) end)
+if not __mourierOk then __mourierFatal(__mourierErr) end
