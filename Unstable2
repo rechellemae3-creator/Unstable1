@@ -1,22 +1,47 @@
--- Mourier Client Lite: crash catcher (shows the error on screen if anything fails to load)
+-- Mourier Client Lite: boot label + crash catcher (so something is always visible on screen)
+local function __mourierParent(gui)
+    local parented = false
+    if gethui then
+        parented = pcall(function() gui.Parent = gethui() end) and gui.Parent ~= nil
+    end
+    if not parented then
+        parented = pcall(function() gui.Parent = game:GetService("CoreGui") end) and gui.Parent ~= nil
+    end
+    if not parented then
+        gui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    end
+end
+local __mourierBoot = nil
+pcall(function()
+    local bootGui = Instance.new("ScreenGui")
+    bootGui.Name = "MourierBoot"
+    bootGui.ResetOnSpawn = false
+    bootGui.DisplayOrder = 1999
+    bootGui.IgnoreGuiInset = true
+    __mourierParent(bootGui)
+    local label = Instance.new("TextLabel")
+    label.AnchorPoint = Vector2.new(0.5, 0)
+    label.Position = UDim2.new(0.5, 0, 0, 8)
+    label.Size = UDim2.fromOffset(330, 26)
+    label.BackgroundColor3 = Color3.fromRGB(30, 24, 48)
+    label.BorderSizePixel = 0
+    label.Text = "Mourier Client: loading game modules..."
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 12
+    label.Parent = bootGui
+    __mourierBoot = bootGui
+end)
 local function __mourierFatal(message)
     warn("[Mourier] load failed: " .. tostring(message))
+    if __mourierBoot then pcall(function() __mourierBoot:Destroy() end) end
     pcall(function()
         local gui = Instance.new("ScreenGui")
         gui.Name = "MourierError"
         gui.ResetOnSpawn = false
         gui.DisplayOrder = 2000
         gui.IgnoreGuiInset = true
-        local parented = false
-        if gethui then
-            parented = pcall(function() gui.Parent = gethui() end) and gui.Parent ~= nil
-        end
-        if not parented then
-            parented = pcall(function() gui.Parent = game:GetService("CoreGui") end) and gui.Parent ~= nil
-        end
-        if not parented then
-            gui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-        end
+        __mourierParent(gui)
         local frame = Instance.new("Frame")
         frame.AnchorPoint = Vector2.new(0.5, 0.5)
         frame.Position = UDim2.fromScale(0.5, 0.5)
@@ -72,8 +97,8 @@ local Workspace = game:GetService("Workspace")
 local MaterialService = game:GetService("MaterialService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts")
-local MC_Client = PlayerScripts:WaitForChild("MC")
-local MC_Shared = ReplicatedStorage:WaitForChild("MC")
+local MC_Client = PlayerScripts:WaitForChild("MC", 20) or error("MC client folder not found - this is not Unstable SMP, or it is still loading")
+local MC_Shared = ReplicatedStorage:WaitForChild("MC", 20) or error("MC shared folder not found - this is not Unstable SMP, or it is still loading")
 local Config = require(MC_Shared.Config)
 local Items = require(MC_Shared.Items)
 local Combat = require(MC_Shared.Combat)
@@ -3783,6 +3808,43 @@ local Lite = (function()
 
     return Lib
 end)()
+-- BRIDGE for MourierButtons.lua (defined before the GUI so the buttons work even if the menu fails)
+;(function()
+    local apiEnv = (getgenv and getgenv()) or _G
+    local prevLungeMode = nil
+    local function setOpt(key, value)
+        local opt = Lite.Options[key]
+        if opt and opt.SetValue then
+            opt:SetValue(value)
+        else
+            Cfg[key] = value
+            scheduleSave()
+        end
+    end
+    apiEnv.MourierAPI = {
+        version = 2,
+        cart = function() triggerTNTCartBurst(true) end,
+        lunge = function() manualSpearLungeUntil = os.clock() + 0.45 end,
+        elytra = function() swapChestArmor(nil, false) end,
+        mace = function() doWindChargeJump() end,
+        get = function(key) return Cfg[key] end,
+        set = function(key, value) setOpt(key, value) end,
+        setLungeAuto = function(on)
+            if on then
+                if Cfg.SpearLungeMode ~= "Always" then prevLungeMode = Cfg.SpearLungeMode end
+                setOpt("SpearLungeMode", "Always")
+                setOpt("SpearAutoSwap", true)
+                setOpt("AutoSpearLunge", true)
+            else
+                setOpt("AutoSpearLunge", false)
+                if prevLungeMode then
+                    setOpt("SpearLungeMode", prevLungeMode)
+                    prevLungeMode = nil
+                end
+            end
+        end,
+    }
+end)()
 local Window = Lite:CreateWindow({
     Title = "Mourier Client — Unstable SMP [v3.1]",
     SubTitle = "Sword & Mace PvP | Keystrokes & CPS | Packs  •  RightCtrl or MC button",
@@ -4545,230 +4607,6 @@ if savedPackFolder and isfolder and isfolder(PACK_ROOT .. "/" .. savedPackFolder
         end
     end)
 end
--- MOBILE ACTION BUTTONS (double-tap a button to unlock + move it)
-;(function()
-    local MB_FILE = "MourierButtons.json"
-    local mbPos = {}
-    pcall(function()
-        if isfile and readfile and isfile(MB_FILE) then
-            local data = HttpService:JSONDecode(readfile(MB_FILE))
-            if type(data) == "table" then mbPos = data end
-        end
-    end)
-    local mbGui = Lite:GetGui()
-    local mbButtons = {}
-    local prevLungeMode = nil
-    local function onLungeAuto(on)
-        local modeOpt = Lite.Options.SpearLungeMode
-        local swapOpt = Lite.Options.SpearAutoSwap
-        if on then
-            if Cfg.SpearLungeMode ~= "Always" then prevLungeMode = Cfg.SpearLungeMode end
-            if modeOpt then modeOpt:SetValue("Always") else Cfg.SpearLungeMode = "Always" end
-            if swapOpt then swapOpt:SetValue(true) else Cfg.SpearAutoSwap = true end
-        elseif prevLungeMode then
-            if modeOpt then modeOpt:SetValue(prevLungeMode) else Cfg.SpearLungeMode = prevLungeMode end
-            prevLungeMode = nil
-        end
-    end
-    local mbDefs = {
-        { id = "Cart", label = "TNT Cart Combo", text = "TNT CART", run = function() triggerTNTCartBurst(true) end },
-        { id = "Lunge", label = "Spear Lunge (1 shot)", text = "SPEAR LUNGE", run = function() manualSpearLungeUntil = os.clock() + 0.45 end },
-        { id = "LungeAuto", label = "Lunge Auto ON/OFF", text = "LUNGE AUTO", toggle = "AutoSpearLunge", onToggle = onLungeAuto },
-        { id = "Elytra", label = "Elytra Swap", text = "ELYTRA SWAP", run = function() swapChestArmor(nil, false) end },
-    }
-    local COL_IDLE = Color3.fromRGB(52, 40, 96)
-    local COL_ON = Color3.fromRGB(70, 170, 100)
-    local COL_UNLOCK = Color3.fromRGB(240, 190, 60)
-    local BTN_W, BTN_H = 74, 40
-
-    local function mbSave()
-        if not writefile then return end
-        pcall(function() writefile(MB_FILE, HttpService:JSONEncode(mbPos)) end)
-    end
-
-    local function defaultPos(index)
-        return { x = 0.86, y = 0.30 + 0.11 * (index - 1) }
-    end
-
-    for index, def in ipairs(mbDefs) do
-        local pos = mbPos[def.id]
-        if type(pos) ~= "table" or type(pos.x) ~= "number" or type(pos.y) ~= "number" then
-            pos = defaultPos(index)
-        end
-        local btn = Instance.new("TextButton")
-        btn.Name = "MB_" .. def.id
-        btn.Size = UDim2.fromOffset(BTN_W, BTN_H)
-        btn.Position = UDim2.fromScale(math.clamp(pos.x, 0, 0.95), math.clamp(pos.y, 0, 0.95))
-        btn.BackgroundColor3 = COL_IDLE
-        btn.BorderSizePixel = 0
-        btn.AutoButtonColor = false
-        btn.Text = def.text
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 11
-        btn.TextWrapped = true
-        btn.ZIndex = 15
-        local cr = Instance.new("UICorner")
-        cr.CornerRadius = UDim.new(0, 8)
-        cr.Parent = btn
-        local stroke = Instance.new("UIStroke")
-        stroke.Thickness = 2
-        stroke.Color = COL_UNLOCK
-        stroke.Enabled = false
-        stroke.Parent = btn
-        btn.Parent = mbGui
-
-        local unlocked = false
-        local lastTap = -10
-        local token = 0
-        local dragging = false
-        local dragStart, dragFrom, moved = nil, nil, 0
-
-        local function refresh()
-            if unlocked then
-                btn.BackgroundColor3 = COL_UNLOCK
-                btn.TextColor3 = Color3.new(0, 0, 0)
-                btn.Text = "MOVE ME"
-            else
-                btn.TextColor3 = Color3.new(1, 1, 1)
-                btn.Text = def.text
-                if def.toggle then
-                    local on = Cfg[def.toggle] and true or false
-                    btn.BackgroundColor3 = on and COL_ON or COL_IDLE
-                    btn.Text = def.text .. (on and "\nON" or "\nOFF")
-                else
-                    btn.BackgroundColor3 = COL_IDLE
-                end
-            end
-            stroke.Enabled = unlocked
-        end
-
-        local function lock()
-            unlocked = false
-            dragging = false
-            token = token + 1
-            local vp = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or Vector2.new(800, 600)
-            local ax, ay = btn.AbsolutePosition.X, btn.AbsolutePosition.Y
-            local sx = math.clamp(ax / vp.X, 0, 1 - BTN_W / vp.X)
-            local sy = math.clamp(ay / vp.Y, 0, 1 - BTN_H / vp.Y)
-            btn.Position = UDim2.fromScale(sx, sy)
-            mbPos[def.id] = { x = sx, y = sy }
-            mbSave()
-            refresh()
-        end
-
-        local function unlock()
-            unlocked = true
-            token = token + 1
-            local mine = token
-            refresh()
-            task.delay(6, function()
-                if unlocked and not dragging and token == mine then lock() end
-            end)
-        end
-
-        btn.InputBegan:Connect(function(input)
-            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
-                return
-            end
-            if unlocked then
-                dragging = true
-                dragStart = input.Position
-                dragFrom = btn.Position
-                moved = 0
-                return
-            end
-            local now = os.clock()
-            if now - lastTap <= 0.35 then
-                lastTap = 0
-                unlock()
-                return
-            end
-            lastTap = now
-            if def.run then
-                task.spawn(function()
-                    local ok, err = pcall(def.run)
-                    if not ok then warn("[Mourier] " .. tostring(err)) end
-                end)
-            elseif def.toggle then
-                local opt = Lite.Options[def.toggle]
-                if opt then opt:SetValue(not opt.Value) else Cfg[def.toggle] = not Cfg[def.toggle] end
-                refresh()
-            end
-        end)
-
-        Lite:Track(UserInputService.InputChanged:Connect(function(input)
-            if not dragging then return end
-            if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
-                return
-            end
-            local delta = input.Position - dragStart
-            moved = math.max(moved, math.abs(delta.X) + math.abs(delta.Y))
-            btn.Position = UDim2.new(dragFrom.X.Scale, dragFrom.X.Offset + delta.X, dragFrom.Y.Scale, dragFrom.Y.Offset + delta.Y)
-        end))
-
-        Lite:Track(UserInputService.InputEnded:Connect(function(input)
-            if not dragging then return end
-            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
-                return
-            end
-            dragging = false
-            lock()
-        end))
-
-        if def.toggle and Lite.Options[def.toggle] then
-            Lite.Options[def.toggle]:OnChanged(function(v)
-                if def.onToggle then def.onToggle(v and true or false) end
-                refresh()
-            end)
-        end
-        refresh()
-        table.insert(mbButtons, { btn = btn, id = def.id, index = index, lock = lock, label = def.label, shown = true })
-    end
-
-    local masterOn = true
-    local function applyVisibility()
-        for _, item in ipairs(mbButtons) do
-            item.btn.Visible = masterOn and item.shown
-        end
-    end
-    local BtnTab = Window:AddTab({ Title = "Mobile Buttons" })
-    BtnTab:AddParagraph({
-        Title = "On-Screen Action Buttons",
-        Content = "Tap = action. Double-tap a button to unlock it (yellow), drag it, release to lock. LUNGE AUTO ON switches Spear Lunge to 'Always' so it lunges without holding the spear."
-    })
-    BtnTab:AddToggle("MobileButtons", {
-        Title = "Show All Action Buttons",
-        Description = "Master switch for every on-screen button",
-        Default = true,
-        Callback = function(v)
-            masterOn = v and true or false
-            applyVisibility()
-        end
-    })
-    for _, item in ipairs(mbButtons) do
-        BtnTab:AddToggle("MobileBtn_" .. item.id, {
-            Title = "Show: " .. item.label,
-            Default = true,
-            Callback = function(v)
-                item.shown = v and true or false
-                applyVisibility()
-            end
-        })
-    end
-    BtnTab:AddButton({
-        Title = "Reset Button Layout",
-        Description = "Puts all on-screen action buttons back in their default column",
-        Callback = function()
-            for _, item in ipairs(mbButtons) do
-                local d = defaultPos(item.index)
-                item.btn.Position = UDim2.fromScale(d.x, d.y)
-                mbPos[item.id] = d
-            end
-            mbSave()
-        end
-    })
-end)()
 Window:SelectTab(Config.NO_MACE and 2 or 1)
 safeNotify({
     Title = "Mourier Client v3.1 Loaded",
@@ -4811,4 +4649,5 @@ if type(stateObj) == "table" and stateObj.onCleanup then
     end)
 end
 end, function(e) return debug.traceback(tostring(e), 2) end)
+if __mourierBoot then pcall(function() __mourierBoot:Destroy() end) end
 if not __mourierOk then __mourierFatal(__mourierErr) end
